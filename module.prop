@@ -1,0 +1,6 @@
+id=caros-switcher
+name=CarOS Profile Switcher (AA filaire & sans fil)
+version=0.2.3
+versionCode=4
+author=Vincent+ChatGPT
+description=Commutation auto WIRED/WIRELESS + WiFi intelligent + Nova défaut + limite charge rapide. Config: /sdcard/CarOS/config.env. v0.2.3: WiFi smart + VW Polo 6 compatible

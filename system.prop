@@ -1,0 +1,2 @@
+# CarOS defaults
+ro.config.low_ram=false
