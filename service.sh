@@ -264,13 +264,21 @@ AA_CACHE=""
 AA_CACHE_TIME=0
 BT_CACHE=""
 BT_CACHE_TIME=0
-log "CarOS Profile Switcher service v0.2.1 started"
+log "CarOS Profile Switcher service v0.2.3 started"
+
+# Grant permissions on service start (async)
+"$MODDIR/grant_permissions.sh" &
 
 while true; do
   LOOP_COUNT=$((LOOP_COUNT + 1))
   
   # Log périodique pour prouver que le service fonctionne
   [ $((LOOP_COUNT % 100)) -eq 0 ] && log "Service alive, loop #$LOOP_COUNT"
+  
+  # Re-grant permissions periodically (every ~30 minutes = 600 loops)
+  if [ $((LOOP_COUNT % 600)) -eq 0 ]; then
+    "$MODDIR/grant_permissions.sh" &
+  fi
   
   WIRED=0
   WIRELESS=0

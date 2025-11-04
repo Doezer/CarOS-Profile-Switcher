@@ -1,0 +1,47 @@
+# Build artifacts / Release directory
+rel/
+*.zip
+
+# Logs
+*.log
+*.txt
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+*~
+.*.sw?
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node (if used for tooling)
+node_modules/
+package-lock.json
+
+# Python (if used for tooling)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Test files
+test/
+tests/
+*.test.sh

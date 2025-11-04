@@ -1,0 +1,126 @@
+name: Validate Module
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check required files exist
+      run: |
+        echo "Validating module structure..."
+        MISSING=0
+        
+        for file in caros_config.sh module.prop post-fs-data.sh service.sh system.prop grant_permissions.sh; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Missing: $file"
+            MISSING=1
+          else
+            echo "✓ Found: $file"
+          fi
+        done
+        
+        if [ ! -d "META-INF/com/google/android" ]; then
+          echo "❌ Missing: META-INF directory structure"
+          MISSING=1
+        else
+          echo "✓ Found: META-INF structure"
+        fi
+        
+        if [ $MISSING -eq 1 ]; then
+          echo "Validation failed!"
+          exit 1
+        fi
+        
+        echo "All files present ✓"
+        
+    - name: Validate shell scripts syntax
+      run: |
+        echo "Checking shell script syntax..."
+        for script in caros_config.sh post-fs-data.sh service.sh grant_permissions.sh; do
+          echo "Checking $script..."
+          bash -n "$script" || { echo "Syntax error in $script"; exit 1; }
+        done
+        echo "All scripts valid ✓"
+        
+    - name: Check version consistency
+      run: |
+        echo "Checking version consistency..."
+        MODULE_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2)
+        SERVICE_VERSION=$(grep "CarOS Profile Switcher service v" service.sh | sed 's/.*service v\([0-9.]*\).*/\1/')
+        CONFIG_VERSION=$(grep "Configuration Centralisée v" caros_config.sh | sed 's/.*v\([0-9.]*\).*/\1/')
+        
+        echo "module.prop version: $MODULE_VERSION"
+        echo "service.sh version: $SERVICE_VERSION"
+        echo "caros_config.sh version: $CONFIG_VERSION"
+        
+        if [ "$MODULE_VERSION" != "$SERVICE_VERSION" ] || [ "$MODULE_VERSION" != "$CONFIG_VERSION" ]; then
+          echo "❌ Version mismatch detected!"
+          exit 1
+        fi
+        
+        echo "✓ All versions consistent: $MODULE_VERSION"
+        
+    - name: Validate module.prop format
+      run: |
+        echo "Validating module.prop..."
+        
+        if ! grep -q "^id=" module.prop; then
+          echo "❌ Missing 'id' field"
+          exit 1
+        fi
+        
+        if ! grep -q "^name=" module.prop; then
+          echo "❌ Missing 'name' field"
+          exit 1
+        fi
+        
+        if ! grep -q "^version=" module.prop; then
+          echo "❌ Missing 'version' field"
+          exit 1
+        fi
+        
+        if ! grep -q "^versionCode=" module.prop; then
+          echo "❌ Missing 'versionCode' field"
+          exit 1
+        fi
+        
+        echo "✓ module.prop format valid"
+        
+    - name: Test build process
+      run: |
+        echo "Testing build process..."
+        VERSION=$(grep "^version=" module.prop | cut -d'=' -f2)
+        mkdir -p rel
+        
+        zip -r "rel/CarOS_Profile_Switcher-v${VERSION}.zip" \
+          caros_config.sh \
+          module.prop \
+          post-fs-data.sh \
+          service.sh \
+          system.prop \
+          grant_permissions.sh \
+          META-INF
+        
+        if [ ! -f "rel/CarOS_Profile_Switcher-v${VERSION}.zip" ]; then
+          echo "❌ Build failed"
+          exit 1
+        fi
+        
+        SIZE=$(stat -f%z "rel/CarOS_Profile_Switcher-v${VERSION}.zip" 2>/dev/null || stat -c%s "rel/CarOS_Profile_Switcher-v${VERSION}.zip")
+        echo "✓ Build successful: $(($SIZE / 1024)) KB"
+        
+    - name: Summary
+      run: |
+        echo "========================================="
+        echo "✅ All validation checks passed!"
+        echo "========================================="

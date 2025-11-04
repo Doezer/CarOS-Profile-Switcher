@@ -20,7 +20,7 @@ DEFAULT_KEEP_DATA_IN_CAR=1
 
 # Limitation CPU hors voiture (en kHz). Laisse vide pour ne pas toucher.
 # Exemple : 1516800 pour ~1.5 GHz.
-DEFAULT_IDLE_MAX_CPU_FREQ=""
+DEFAULT_IDLE_MAX_CPU_FREQ="1516800"
 
 # WIRED: limiter la charge rapide / réduire la chauffe (best effort). 1 = activer
 DEFAULT_LIMIT_QUICK_CHARGE_WIRED=1
@@ -30,9 +30,13 @@ DEFAULT_SET_NOVA_DEFAULT=1
 
 # Gestion WiFi avancée
 # WIRED: garder WiFi actif (1) ou l'éteindre (0) - utile pour VW Polo 6, etc.
-DEFAULT_KEEP_WIFI_IN_WIRED=1
+DEFAULT_KEEP_WIFI_IN_WIRED=0
 # IDLE: garder WiFi actif (1) ou l'éteindre (0) 
-DEFAULT_KEEP_WIFI_IN_IDLE=1
+DEFAULT_KEEP_WIFI_IN_IDLE=0
+
+# Gestion automatique des permissions (notifications et localisation)
+# Accorde automatiquement les permissions nécessaires pour Android Auto, Waze, Maps, etc.
+DEFAULT_AUTO_GRANT_PERMISSIONS=1
 
 # Logs verbeux
 DEFAULT_VERBOSE=1
@@ -73,6 +77,9 @@ KEEP_WIFI_IN_WIRED=$DEFAULT_KEEP_WIFI_IN_WIRED
 # IDLE: garder WiFi actif (1) ou l'éteindre (0) 
 KEEP_WIFI_IN_IDLE=$DEFAULT_KEEP_WIFI_IN_IDLE
 
+# Gestion automatique des permissions (notifications et localisation)
+AUTO_GRANT_PERMISSIONS=$DEFAULT_AUTO_GRANT_PERMISSIONS
+
 # Logs verbeux
 VERBOSE=$DEFAULT_VERBOSE
 EOF
@@ -90,5 +97,6 @@ apply_defaults() {
   : "${SET_NOVA_DEFAULT:=$DEFAULT_SET_NOVA_DEFAULT}"
   : "${KEEP_WIFI_IN_WIRED:=$DEFAULT_KEEP_WIFI_IN_WIRED}"
   : "${KEEP_WIFI_IN_IDLE:=$DEFAULT_KEEP_WIFI_IN_IDLE}"
+  : "${AUTO_GRANT_PERMISSIONS:=$DEFAULT_AUTO_GRANT_PERMISSIONS}"
   : "${VERBOSE:=$DEFAULT_VERBOSE}"
 }
