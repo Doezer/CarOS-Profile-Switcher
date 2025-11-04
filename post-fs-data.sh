@@ -3,10 +3,10 @@ MODDIR=${0%/*}
 LOGDIR=/data/adb/modules/caros-switcher
 CONFDIR=/sdcard/CarOS
 
-# Source de la configuration centralisée
+# Source the centralized configuration
 . "$MODDIR/caros_config.sh"
 
-# Attente que /sdcard soit monté (pour LineageOS)
+# Wait for /sdcard to be mounted (for LineageOS)
 for i in $(seq 1 30); do
   if [ -d "/sdcard" ] && [ -w "/sdcard" ]; then
     break
@@ -19,12 +19,12 @@ mkdir -p "$CONFDIR" 2>/dev/null
 
 CONF="$CONFDIR/config.env"
 if [ ! -f "$CONF" ]; then
-  # Vérification que /sdcard est bien accessible
+  # Check that /sdcard is accessible
   if [ -w "/sdcard" ]; then
     generate_user_config > "$CONF"
     chmod 0644 "$CONF"
   else
-    # Si /sdcard n'est pas accessible, on laisse service.sh s'en charger
+    # If /sdcard is not accessible, let service.sh handle it
     echo "$(date) [post-fs-data] /sdcard not writable, config will be created by service.sh" >> "$LOGDIR/log.txt"
   fi
 fi

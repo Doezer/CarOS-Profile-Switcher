@@ -4,10 +4,10 @@ LOGFILE=/data/adb/modules/caros-switcher/log.txt
 CONFFILE=/sdcard/CarOS/config.env
 STATEFILE=/data/adb/modules/caros-switcher/state.json
 
-# Source de la configuration centralisée
+# Source the centralized configuration
 . "$MODDIR/caros_config.sh"
 
-# Rotation des logs si > 1MB
+# Rotate logs if > 1MB
 if [ -f "$LOGFILE" ] && [ "$(stat -c%s "$LOGFILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
   mv "$LOGFILE" "${LOGFILE}.old" 2>/dev/null
 fi
@@ -15,7 +15,7 @@ fi
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $@" >> "$LOGFILE"; }
 error_log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $@" >> "$LOGFILE"; }
 
-# Création de la configuration si elle n'existe pas
+# Create configuration if it doesn't exist
 if [ ! -f "$CONFFILE" ]; then
   mkdir -p "$(dirname "$CONFFILE")"
   log "Creating config file: $CONFFILE"
@@ -26,7 +26,7 @@ fi
 
 [ -f "$CONFFILE" ] && . "$CONFFILE"
 
-# Application des valeurs par défaut
+# Apply default values
 apply_defaults
 
 vlog(){ [ "$VERBOSE" = "1" ] && log "[DBG]" "$@"; }
@@ -168,7 +168,7 @@ usb_connected(){
 }
 
 aa_process_active(){
-  # Cache pour éviter les appels répétés
+  # Cache to avoid repeated calls
   if [ -n "$AA_CACHE" ] && [ $(($(date +%s) - AA_CACHE_TIME)) -lt 2 ]; then
     [ "$AA_CACHE" = "1" ] && return 0 || return 1
   fi
@@ -189,19 +189,19 @@ aa_process_active(){
 }
 
 bt_connected_to_audi(){
-  # Vérification rapide avec cache
+  # Quick check with cache
   if [ -n "$BT_CACHE" ] && [ $(($(date +%s) - BT_CACHE_TIME)) -lt 5 ]; then
     [ "$BT_CACHE" = "1" ] && return 0 || return 1
   fi
   
   BT_CACHE_TIME=$(date +%s)
   
-  # Échappement des caractères spéciaux dans AUDI_BT_NAMES
+  # Escape special characters in AUDI_BT_NAMES
   ESCAPED_NAMES="$(echo "$AUDI_BT_NAMES" | sed 's/[].[^$\\/*]/\\&/g')"
   
-  # Tentative rapide avec dumpsys
+  # Quick attempt with dumpsys
   if DUMP="$(dumpsys bluetooth_manager 2>/dev/null | head -100)"; then
-    # Vérification par MAC si spécifié
+    # Check by MAC if specified
     if [ -n "$AUDI_BT_MAC" ]; then
       if echo "$DUMP" | grep -i "$AUDI_BT_MAC" | grep -qi "Connected.*true\|State.*Connected"; then
         BT_CACHE=1
@@ -209,13 +209,13 @@ bt_connected_to_audi(){
       fi
     fi
     
-    # Vérification par nom
+    # Check by name
     if echo "$DUMP" | grep -Eiq "Name:.*($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected.*true\|State.*Connected"; then
       BT_CACHE=1
       return 0
     fi
     
-    # Fallback: recherche plus large
+    # Fallback: broader search
     if echo "$DUMP" | grep -Eiq "($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected"; then
       BT_CACHE=1
       return 0
@@ -272,7 +272,7 @@ log "CarOS Profile Switcher service v0.2.3 started"
 while true; do
   LOOP_COUNT=$((LOOP_COUNT + 1))
   
-  # Log périodique pour prouver que le service fonctionne
+  # Periodic log to prove the service is working
   [ $((LOOP_COUNT % 100)) -eq 0 ] && log "Service alive, loop #$LOOP_COUNT"
   
   # Re-grant permissions periodically (every ~30 minutes = 600 loops)
@@ -283,7 +283,7 @@ while true; do
   WIRED=0
   WIRELESS=0
 
-  # Vérification avec gestion d'erreur
+  # Check with error handling
   if usb_connected && aa_process_active; then
     WIRED=1
     vlog "Detected WIRED mode"
@@ -316,7 +316,7 @@ while true; do
         ;;
     esac
     STATE="$NEWSTATE"
-    # Sauvegarde de l'état
+    # Save state
     echo "{\"state\":\"$STATE\",\"timestamp\":\"$(date)\"}" > "$STATEFILE" 2>/dev/null
   fi
 

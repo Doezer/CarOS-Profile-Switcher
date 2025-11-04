@@ -113,7 +113,7 @@ $VERSION = "0.2.4"
 New-Item -ItemType Directory -Force -Path "rel"
 
 # Create the ZIP file (from project root)
-Compress-Archive -Path "caros_config.sh", "module.prop", "post-fs-data.sh", "service.sh", "system.prop", "META-INF" -DestinationPath "rel/CarOS_Profile_Switcher-v$VERSION.zip" -Force
+Compress-Archive -Path "caros_config.sh", "module.prop", "post-fs-data.sh", "service.sh", "system.prop", "grant_permissions.sh", "META-INF" -DestinationPath "rel/CarOS_Profile_Switcher-v$VERSION.zip" -Force
 
 Write-Host "Release created: rel/CarOS_Profile_Switcher-v$VERSION.zip"
 ```
@@ -141,6 +141,7 @@ Write-Host "Release created: rel/CarOS_Profile_Switcher-v$VERSION.zip"
    - `post-fs-data.sh`
    - `service.sh`
    - `system.prop`
+   - `grant_permissions.sh`
    - `META-INF/` (entire directory)
 
 4. **Name Convention**:
@@ -167,6 +168,7 @@ zip -r "rel/CarOS_Profile_Switcher-v${VERSION}.zip" \
     post-fs-data.sh \
     service.sh \
     system.prop \
+    grant_permissions.sh \
     META-INF
 echo "Release created: rel/CarOS_Profile_Switcher-v${VERSION}.zip"
 ```

@@ -1,91 +1,91 @@
 #!/system/bin/sh
-# === CarOS Profile Switcher Configuration Centralisée v0.2.3 ===
-# Ce fichier contient toute la configuration par défaut du module
-# Il est sourcé par post-fs-data.sh et service.sh pour garantir la cohérence
+# === CarOS Profile Switcher Centralized Configuration v0.2.3 ===
+# This file contains all default configuration for the module
+# It is sourced by post-fs-data.sh and service.sh to ensure consistency
 
-# Plusieurs noms BT possibles, séparés par | (regex), ex: "Audi|AUDI MMI|MyAudi"
+# Multiple BT names possible, separated by | (regex), ex: "Audi|AUDI MMI|MyAudi"
 DEFAULT_AUDI_BT_NAMES="Audi"
 
-# (Optionnel) Adresse MAC si tu préfères matcher par MAC
+# (Optional) MAC address if you prefer matching by MAC
 DEFAULT_AUDI_BT_MAC=""
 
-# Mode filaire : garder Bluetooth actif (1) ou l'éteindre (0)
+# Wired mode: keep Bluetooth active (1) or turn it off (0)
 DEFAULT_ALLOW_BT_IN_WIRED=1
 
-# Gestion de la data mobile
-# Hors voiture : désactiver la data mobile (1) ou la laisser active (0)
+# Mobile data management
+# Outside car: disable mobile data (1) or leave it active (0)
 DEFAULT_DATA_OFF_OUTSIDE=1
-# En voiture : garder la data active (1) pour Waze/Spotify ou l'éteindre (0)
+# In car: keep data active (1) for Waze/Spotify or turn it off (0)
 DEFAULT_KEEP_DATA_IN_CAR=1
 
-# Limitation CPU hors voiture (en kHz). Laisse vide pour ne pas toucher.
-# Exemple : 1516800 pour ~1.5 GHz.
+# CPU limitation outside car (in kHz). Leave empty to not modify.
+# Example: 1516800 for ~1.5 GHz.
 DEFAULT_IDLE_MAX_CPU_FREQ="1516800"
 
-# WIRED: limiter la charge rapide / réduire la chauffe (best effort). 1 = activer
+# WIRED: limit fast charging / reduce heat (best effort). 1 = enable
 DEFAULT_LIMIT_QUICK_CHARGE_WIRED=1
 
-# Définir Nova Launcher comme launcher par défaut (1 = activer, 0 = désactiver)
+# Set Nova Launcher as default launcher (1 = enable, 0 = disable)
 DEFAULT_SET_NOVA_DEFAULT=1
 
-# Gestion WiFi avancée
-# WIRED: garder WiFi actif (1) ou l'éteindre (0) - utile pour VW Polo 6, etc.
+# Advanced WiFi management
+# WIRED: keep WiFi active (1) or turn it off (0) - useful for VW Polo 6, etc.
 DEFAULT_KEEP_WIFI_IN_WIRED=0
-# IDLE: garder WiFi actif (1) ou l'éteindre (0) 
+# IDLE: keep WiFi active (1) or turn it off (0) 
 DEFAULT_KEEP_WIFI_IN_IDLE=0
 
-# Gestion automatique des permissions (notifications et localisation)
-# Accorde automatiquement les permissions nécessaires pour Android Auto, Waze, Maps, etc.
+# Automatic permission management (notifications and location)
+# Automatically grants necessary permissions for Android Auto, Waze, Maps, etc.
 DEFAULT_AUTO_GRANT_PERMISSIONS=1
 
-# Logs verbeux
+# Verbose logs
 DEFAULT_VERBOSE=1
 
-# Fonction pour générer le contenu de configuration utilisateur
+# Function to generate user configuration content
 generate_user_config() {
 cat <<EOF
 # === CarOS Profile Switcher Configuration v0.2.3 ===
 
-# Plusieurs noms BT possibles, séparés par | (regex), ex: "Audi|AUDI MMI|MyAudi"
+# Multiple BT names possible, separated by | (regex), ex: "Audi|AUDI MMI|MyAudi"
 AUDI_BT_NAMES="$DEFAULT_AUDI_BT_NAMES"
 
-# (Optionnel) Adresse MAC si tu préfères matcher par MAC
+# (Optional) MAC address if you prefer matching by MAC
 AUDI_BT_MAC="$DEFAULT_AUDI_BT_MAC"
 
-# Mode filaire : garder Bluetooth actif (1) ou l'éteindre (0)
+# Wired mode: keep Bluetooth active (1) or turn it off (0)
 ALLOW_BT_IN_WIRED=$DEFAULT_ALLOW_BT_IN_WIRED
 
-# Gestion de la data mobile
-# Hors voiture : désactiver la data mobile (1) ou la laisser active (0)
+# Mobile data management
+# Outside car: disable mobile data (1) or leave it active (0)
 DATA_OFF_OUTSIDE=$DEFAULT_DATA_OFF_OUTSIDE
-# En voiture : garder la data active (1) pour Waze/Spotify ou l'éteindre (0)
+# In car: keep data active (1) for Waze/Spotify or turn it off (0)
 KEEP_DATA_IN_CAR=$DEFAULT_KEEP_DATA_IN_CAR
 
-# Limitation CPU hors voiture (en kHz). Laisse vide pour ne pas toucher.
-# Exemple : 1516800 pour ~1.5 GHz.
+# CPU limitation outside car (in kHz). Leave empty to not modify.
+# Example: 1516800 for ~1.5 GHz.
 IDLE_MAX_CPU_FREQ=$DEFAULT_IDLE_MAX_CPU_FREQ
 
-# WIRED: limiter la charge rapide / réduire la chauffe (best effort). 1 = activer
+# WIRED: limit fast charging / reduce heat (best effort). 1 = enable
 LIMIT_QUICK_CHARGE_WIRED=$DEFAULT_LIMIT_QUICK_CHARGE_WIRED
 
-# Définir Nova Launcher comme launcher par défaut (1 = activer, 0 = désactiver)
+# Set Nova Launcher as default launcher (1 = enable, 0 = disable)
 SET_NOVA_DEFAULT=$DEFAULT_SET_NOVA_DEFAULT
 
-# Gestion WiFi avancée
-# WIRED: garder WiFi actif (1) ou l'éteindre (0) - utile pour VW Polo 6, etc.
+# Advanced WiFi management
+# WIRED: keep WiFi active (1) or turn it off (0) - useful for VW Polo 6, etc.
 KEEP_WIFI_IN_WIRED=$DEFAULT_KEEP_WIFI_IN_WIRED
-# IDLE: garder WiFi actif (1) ou l'éteindre (0) 
+# IDLE: keep WiFi active (1) or turn it off (0) 
 KEEP_WIFI_IN_IDLE=$DEFAULT_KEEP_WIFI_IN_IDLE
 
-# Gestion automatique des permissions (notifications et localisation)
+# Automatic permission management (notifications and location)
 AUTO_GRANT_PERMISSIONS=$DEFAULT_AUTO_GRANT_PERMISSIONS
 
-# Logs verbeux
+# Verbose logs
 VERBOSE=$DEFAULT_VERBOSE
 EOF
 }
 
-# Fonction pour appliquer les valeurs par défaut
+# Function to apply default values
 apply_defaults() {
   : "${AUDI_BT_NAMES:=$DEFAULT_AUDI_BT_NAMES}"
   : "${AUDI_BT_MAC:=$DEFAULT_AUDI_BT_MAC}"
