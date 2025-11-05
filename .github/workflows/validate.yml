@@ -57,7 +57,7 @@ jobs:
         echo "Checking version consistency..."
         MODULE_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2)
         SERVICE_VERSION=$(grep "CarOS Profile Switcher service v" service.sh | sed 's/.*service v\([0-9.]*\).*/\1/')
-        CONFIG_VERSION=$(grep "Configuration Centralisée v" caros_config.sh | sed 's/.*v\([0-9.]*\).*/\1/')
+        CONFIG_VERSION=$(grep "Centralized Configuration v" caros_config.sh | sed 's/.*v\([0-9.]*\).*/\1/')
         
         echo "module.prop version: $MODULE_VERSION"
         echo "service.sh version: $SERVICE_VERSION"
