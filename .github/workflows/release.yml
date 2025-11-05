@@ -60,8 +60,10 @@ jobs:
         ls -lh "$OUTPUT_FILE"
         
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: rel/*.zip
         body: |
@@ -86,8 +88,6 @@ jobs:
           **Requirements**: Magisk v20.4+, Android Auto, Root access
         draft: false
         prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
