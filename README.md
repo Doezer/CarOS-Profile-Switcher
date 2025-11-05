@@ -1,3 +1,5 @@
+[![Build and Release](https://github.com/Doezer/CarOS-Profile-Switcher/actions/workflows/release.yml/badge.svg)](https://github.com/Doezer/CarOS-Profile-Switcher/actions/workflows/release.yml)
+
 # CarOS Profile Switcher
 
 A Magisk module for Android that automatically switches device profiles based on Android Auto connection state (wired/wireless) and intelligently manages device resources for in-car use.
