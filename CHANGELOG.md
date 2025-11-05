@@ -4,6 +4,11 @@ All notable changes to CarOS Profile Switcher will be documented in this file.
 
 ## [Unreleased]
 
+### Planned
+- Improved error handling in service.sh
+
+## [0.2.3] - 2025-11-05
+
 ### Added
 - **🔔 Automatic Permission Management**: New `grant_permissions.sh` script that automatically grants:
   - Notification permissions to Android Auto, Waze, Google Maps, Nova Launcher, Spotify
@@ -11,43 +16,32 @@ All notable changes to CarOS Profile Switcher will be documented in this file.
   - Configurable via `AUTO_GRANT_PERMISSIONS` setting
   - Runs on boot and periodically every 30 minutes to ensure permissions persist
 - Comprehensive documentation suite:
+  - `README.md` with installation, configuration, and deployment guides
   - `EXAMPLES.md` with car-specific configurations (Audi, VW, BMW, Mercedes, etc.)
   - `FAQ.md` with frequently asked questions and troubleshooting
   - `LICENSE` (MIT License)
-  - Enhanced `CONTRIBUTING.md` with detailed guidelines
+  - `CONTRIBUTING.md` with detailed developer guidelines
+  - `.github/copilot-instructions.md` for AI-assisted development
 - GitHub Actions workflows:
   - Automated release building and publishing
-  - Pull request validation and testing
-  - Version consistency checking
-- GitHub issue templates:
-  - Bug report template
-  - Feature request template
-  - Car compatibility report template
-- Improved `.gitignore` with comprehensive exclusions
-
+  - Pull request validation and version consistency checking
+- Build automation:
+  - `build.ps1` for PowerShell
+  - `build.sh` for Bash/Linux
+  - 
 ### Changed
-- README now links to documentation files for better navigation
-- Updated license section to reference LICENSE file
-- Enhanced file structure documentation
-
-## [0.2.3] - 2025-11-04
+- **🌍 Full English Translation**: All code, comments, and log messages translated from French to English
+- Updated to modern GitHub Actions (upload-artifact@v4, action-gh-release@v2)
+- Enhanced error handling and logging throughout all scripts
 
 ### Fixed
 - Fixed duplicate `generate_user_config` call in `post-fs-data.sh`
 - Fixed version mismatch between `module.prop` and `service.sh` log message
-
-### Added
-- Comprehensive README.md with full documentation
-- Build scripts for PowerShell (`build.ps1`) and Bash (`build.sh`)
-- `.gitignore` to exclude build artifacts
-- This CHANGELOG.md file
-
-### Changed
-- Improved documentation for deployment process
+- Fixed duplicate `env` section in release workflow
 
 ---
 
-## [0.2.3] - Previous Release
+## [0.2.2] - Previous Release
 
 ### Added
 - WiFi smart management with configurable keep-on options
