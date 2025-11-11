@@ -7,11 +7,12 @@ All notable changes to CarOS Profile Switcher will be documented in this file.
 ### Added
 - **🎵 Bluetooth Audio Sink Feature**: Enable your phone to receive audio from another device and play it through Android Auto
   - New `ENABLE_BT_AUDIO_SINK` configuration option
-  - Automatically enables A2DP sink mode when in car (WIRED/WIRELESS profiles)
+  - Automatically enables A2DP sink mode when in WIRED mode (USB connection)
+  - **Important limitation**: Only works in WIRED mode - in WIRELESS mode, Bluetooth is already used by car connection
   - Makes device discoverable for pairing with audio source devices
   - Automatically disables in IDLE mode to save battery
   - Configurable Bluetooth audio permissions management
-  - Useful for streaming music from passenger phones to car speakers
+  - Useful for streaming music from passenger phones to car speakers when using wired Android Auto
   - Documentation added to README.md, EXAMPLES.md, and FAQ.md
 
 ### Planned

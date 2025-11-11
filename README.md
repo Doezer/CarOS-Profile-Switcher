@@ -91,6 +91,8 @@ VERBOSE=1
 
 When enabled (`ENABLE_BT_AUDIO_SINK=1`), your CarOS device can receive audio from another phone via Bluetooth and play it through Android Auto on your car's speakers.
 
+**⚠️ Important: Only works in WIRED mode** (USB connection). In wireless mode, Bluetooth is already being used to connect to your car, so it cannot simultaneously receive audio from another device.
+
 ### Use Case
 - Stream music from a passenger's phone to your car speakers
 - Multiple people can share music during the drive
@@ -98,7 +100,7 @@ When enabled (`ENABLE_BT_AUDIO_SINK=1`), your CarOS device can receive audio fro
 
 ### How to Use
 1. Enable the feature in config: `ENABLE_BT_AUDIO_SINK=1`
-2. Connect your CarOS phone to Android Auto (wired or wireless)
+2. Connect your CarOS phone to Android Auto **via USB (wired mode)**
 3. On the emitting phone:
    - Go to Bluetooth settings
    - Look for your CarOS device (it will be discoverable)
@@ -106,9 +108,10 @@ When enabled (`ENABLE_BT_AUDIO_SINK=1`), your CarOS device can receive audio fro
    - Play music - it will stream to your car!
 
 ### Important Notes
-- Only works when in car (WIRED or WIRELESS mode)
+- **Only works in WIRED mode** (when connected to car via USB)
+- Does NOT work in WIRELESS mode (Bluetooth already used by car connection)
 - Automatically disabled when IDLE to save battery
-- Your CarOS device becomes discoverable to nearby Bluetooth devices
+- Your CarOS device becomes discoverable to nearby Bluetooth devices when in wired mode
 - Works best with Bluetooth 4.0+ for quality audio streaming
 - Some devices may not support A2DP sink mode (this is device-dependent)
 

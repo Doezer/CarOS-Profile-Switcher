@@ -304,7 +304,8 @@ apply_wireless_profile(){
   reset_cpu_max
   charge_limit_off
   set_nova_default
-  enable_bt_audio_sink
+  # Note: BT audio sink NOT enabled in wireless mode because Bluetooth is already
+  # being used to connect to the car. It only works in WIRED mode.
   screen_off
 }
 
