@@ -20,6 +20,7 @@ A Magisk module for Android that automatically switches device profiles based on
 - **Battery Saver**: Automatically enable when not in car
 - **Nova Launcher**: Set as default launcher automatically
 - **🔔 Auto Permissions**: Automatically grants notification and location permissions to Android Auto, Waze, Google Maps, and Nova Launcher
+- **🎵 Bluetooth Audio Sink**: Enable your phone to receive audio from another device and play it through Android Auto (car speakers)
 
 ### Configuration
 - User-configurable via `/sdcard/CarOS/config.env`
@@ -79,9 +80,37 @@ KEEP_WIFI_IN_IDLE=1       # Keep WiFi on when idle
 # Automatic permission management
 AUTO_GRANT_PERMISSIONS=1  # Auto-grant notifications & location to AA, Waze, Maps
 
+# Bluetooth audio sink (receive audio from another phone)
+ENABLE_BT_AUDIO_SINK=0     # Enable to receive audio from another device via Bluetooth
+
 # Verbose logging
 VERBOSE=1
 ```
+
+## 🎵 Bluetooth Audio Sink Feature
+
+When enabled (`ENABLE_BT_AUDIO_SINK=1`), your CarOS device can receive audio from another phone via Bluetooth and play it through Android Auto on your car's speakers.
+
+### Use Case
+- Stream music from a passenger's phone to your car speakers
+- Multiple people can share music during the drive
+- Alternative to passing phone cables around
+
+### How to Use
+1. Enable the feature in config: `ENABLE_BT_AUDIO_SINK=1`
+2. Connect your CarOS phone to Android Auto (wired or wireless)
+3. On the emitting phone:
+   - Go to Bluetooth settings
+   - Look for your CarOS device (it will be discoverable)
+   - Pair and connect
+   - Play music - it will stream to your car!
+
+### Important Notes
+- Only works when in car (WIRED or WIRELESS mode)
+- Automatically disabled when IDLE to save battery
+- Your CarOS device becomes discoverable to nearby Bluetooth devices
+- Works best with Bluetooth 4.0+ for quality audio streaming
+- Some devices may not support A2DP sink mode (this is device-dependent)
 
 ## 📝 How It Works
 

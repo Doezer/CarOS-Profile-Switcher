@@ -80,6 +80,30 @@ grant_location_permission() {
   appops set "$package" FINE_LOCATION allow 2>/dev/null
 }
 
+# Grant Bluetooth permissions for audio sink functionality
+grant_bluetooth_audio_permissions() {
+  # Check if Bluetooth audio sink is enabled
+  if [ "$ENABLE_BT_AUDIO_SINK" != "1" ]; then
+    return 0
+  fi
+  
+  log "Granting Bluetooth audio permissions for A2DP sink mode"
+  
+  # Grant system-level Bluetooth permissions (Android 12+)
+  pm grant com.android.bluetooth android.permission.BLUETOOTH_CONNECT 2>/dev/null
+  pm grant com.android.bluetooth android.permission.BLUETOOTH_SCAN 2>/dev/null
+  pm grant com.android.bluetooth android.permission.BLUETOOTH_ADVERTISE 2>/dev/null
+  
+  # Grant audio permissions
+  pm grant com.android.bluetooth android.permission.MODIFY_AUDIO_SETTINGS 2>/dev/null
+  pm grant com.android.bluetooth android.permission.RECORD_AUDIO 2>/dev/null
+  
+  # Set app ops for Bluetooth
+  appops set com.android.bluetooth BLUETOOTH_SCAN allow 2>/dev/null
+  appops set com.android.bluetooth BLUETOOTH_CONNECT allow 2>/dev/null
+  appops set com.android.bluetooth BLUETOOTH_ADVERTISE allow 2>/dev/null
+}
+
 # Main execution
 log "Starting permission grants..."
 
@@ -92,5 +116,8 @@ done
 for app in "${LOCATION_APPS[@]}"; do
   grant_location_permission "$app"
 done
+
+# Grant Bluetooth audio permissions
+grant_bluetooth_audio_permissions
 
 log "Permission grants completed"

@@ -115,7 +115,9 @@ IDLE_MAX_CPU_FREQ="1516800"   # Throttle CPU to ~1.5GHz
 LIMIT_QUICK_CHARGE_WIRED=1    # Limit charging
 SET_NOVA_DEFAULT=1
 KEEP_WIFI_IN_WIRED=0          # Turn off WiFi
-KEEP_WIFI_IN_IDLE=0           # Turn off WiFi when idle
+KEEP_WIFI_IN_IDLE=1
+AUTO_GRANT_PERMISSIONS=1
+ENABLE_BT_AUDIO_SINK=0         # Disable to save battery
 VERBOSE=0                      # Reduce logging overhead
 ```
 
@@ -132,6 +134,26 @@ LIMIT_QUICK_CHARGE_WIRED=0    # Allow fast charging
 SET_NOVA_DEFAULT=1
 KEEP_WIFI_IN_WIRED=1          # Keep WiFi on
 KEEP_WIFI_IN_IDLE=1           # Keep WiFi on
+AUTO_GRANT_PERMISSIONS=1
+ENABLE_BT_AUDIO_SINK=0
+VERBOSE=1
+```
+
+### Bluetooth Audio Streaming Enabled
+```bash
+# Enable receiving audio from another phone via Bluetooth
+AUDI_BT_NAMES="Your Car"
+AUDI_BT_MAC=""
+ALLOW_BT_IN_WIRED=1           # Must keep BT on for audio streaming
+DATA_OFF_OUTSIDE=1
+KEEP_DATA_IN_CAR=1
+IDLE_MAX_CPU_FREQ=""
+LIMIT_QUICK_CHARGE_WIRED=1
+SET_NOVA_DEFAULT=1
+KEEP_WIFI_IN_WIRED=0
+KEEP_WIFI_IN_IDLE=1
+AUTO_GRANT_PERMISSIONS=1
+ENABLE_BT_AUDIO_SINK=1        # Enable Bluetooth audio sink mode
 VERBOSE=1
 ```
 

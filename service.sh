@@ -159,6 +159,62 @@ set_nova_default(){
   fi
 }
 
+# Enable Bluetooth audio sink mode (A2DP sink)
+enable_bt_audio_sink(){
+  [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
+  
+  vlog "Enabling Bluetooth audio sink mode"
+  
+  # Ensure Bluetooth is on
+  bt_on
+  sleep 1
+  
+  # Make device discoverable for pairing
+  # Timeout 0 means stay discoverable indefinitely while in car
+  settings put global bluetooth_discoverable_timeout 0 2>/dev/null
+  
+  # Enable Bluetooth discoverability via dumpsys
+  cmd bluetooth_manager enable 2>/dev/null
+  cmd bluetooth_manager set-discoverability on 2>/dev/null || {
+    # Fallback method
+    settings put global bluetooth_on 1 2>/dev/null
+  }
+  
+  # Try to enable A2DP sink mode via system properties
+  setprop persist.bluetooth.a2dp_sink.enabled true 2>/dev/null
+  setprop bluetooth.a2dp.sink.enabled true 2>/dev/null
+  
+  # Try to set Bluetooth class to audio sink
+  setprop bluetooth.device.class 0x240404 2>/dev/null
+  
+  # Enable audio routing to main speaker for Bluetooth audio
+  # This ensures incoming Bluetooth audio plays through system audio
+  settings put system bluetooth_audio_output 0 2>/dev/null
+  
+  vlog "Bluetooth audio sink mode enabled - device should be discoverable"
+  log "BT Audio Sink: Device is now discoverable for audio streaming"
+}
+
+# Disable Bluetooth audio sink mode
+disable_bt_audio_sink(){
+  [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
+  
+  vlog "Disabling Bluetooth audio sink mode"
+  
+  # Disable discoverability to save battery when not in car
+  settings put global bluetooth_discoverable_timeout 120 2>/dev/null
+  cmd bluetooth_manager set-discoverability off 2>/dev/null
+  
+  # Disable A2DP sink mode
+  setprop persist.bluetooth.a2dp_sink.enabled false 2>/dev/null
+  setprop bluetooth.a2dp.sink.enabled false 2>/dev/null
+  
+  # Reset Bluetooth class to default (phone)
+  setprop bluetooth.device.class 0x5A020C 2>/dev/null
+  
+  vlog "Bluetooth audio sink mode disabled"
+}
+
 usb_connected(){
   if [ -f /sys/class/power_supply/usb/online ] && [ "$(cat /sys/class/power_supply/usb/online 2>/dev/null)" = "1" ]; then
     return 0
@@ -236,6 +292,7 @@ apply_wired_profile(){
   reset_cpu_max
   [ "$LIMIT_QUICK_CHARGE_WIRED" = "1" ] && charge_limit_on
   set_nova_default
+  enable_bt_audio_sink
   screen_off
 }
 
@@ -247,6 +304,7 @@ apply_wireless_profile(){
   reset_cpu_max
   charge_limit_off
   set_nova_default
+  enable_bt_audio_sink
   screen_off
 }
 
@@ -256,6 +314,7 @@ apply_idle_profile(){
   battery_saver_on
   set_cpu_max "$IDLE_MAX_CPU_FREQ"
   charge_limit_off
+  disable_bt_audio_sink
 }
 
 STATE=""

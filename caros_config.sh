@@ -38,6 +38,10 @@ DEFAULT_KEEP_WIFI_IN_IDLE=0
 # Automatically grants necessary permissions for Android Auto, Waze, Maps, etc.
 DEFAULT_AUTO_GRANT_PERMISSIONS=1
 
+# Bluetooth audio streaming (enable device as A2DP sink to receive audio from another phone)
+# When enabled, the phone becomes discoverable and can receive audio from another device
+DEFAULT_ENABLE_BT_AUDIO_SINK=0
+
 # Verbose logs
 DEFAULT_VERBOSE=1
 
@@ -80,6 +84,9 @@ KEEP_WIFI_IN_IDLE=$DEFAULT_KEEP_WIFI_IN_IDLE
 # Automatic permission management (notifications and location)
 AUTO_GRANT_PERMISSIONS=$DEFAULT_AUTO_GRANT_PERMISSIONS
 
+# Bluetooth audio streaming (enable device as A2DP sink to receive audio from another phone)
+ENABLE_BT_AUDIO_SINK=$DEFAULT_ENABLE_BT_AUDIO_SINK
+
 # Verbose logs
 VERBOSE=$DEFAULT_VERBOSE
 EOF
@@ -98,5 +105,6 @@ apply_defaults() {
   : "${KEEP_WIFI_IN_WIRED:=$DEFAULT_KEEP_WIFI_IN_WIRED}"
   : "${KEEP_WIFI_IN_IDLE:=$DEFAULT_KEEP_WIFI_IN_IDLE}"
   : "${AUTO_GRANT_PERMISSIONS:=$DEFAULT_AUTO_GRANT_PERMISSIONS}"
+  : "${ENABLE_BT_AUDIO_SINK:=$DEFAULT_ENABLE_BT_AUDIO_SINK}"
   : "${VERBOSE:=$DEFAULT_VERBOSE}"
 }

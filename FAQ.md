@@ -130,6 +130,34 @@ In wired mode, the module tries to reduce fast charging to prevent phone overhea
 ### Does Nova Launcher need to be installed?
 No. If `SET_NOVA_DEFAULT=1` but Nova isn't installed, the module just skips this step. No errors.
 
+### How does Bluetooth audio sink work?
+When `ENABLE_BT_AUDIO_SINK=1`, your CarOS phone becomes discoverable and can receive audio from another phone via Bluetooth. The audio is automatically played through your car speakers via Android Auto.
+
+**To use:**
+1. Enable in config: `ENABLE_BT_AUDIO_SINK=1`
+2. Connect your CarOS phone to Android Auto
+3. Pair the emitting phone with your CarOS device via Bluetooth
+4. Play music on the emitting phone - it will stream to your car!
+
+### Does Bluetooth audio sink work on all devices?
+No, it's device-dependent. Some Android devices don't support A2DP sink mode. The module will try to enable it, but success depends on:
+- Device hardware support
+- Android version (works better on Android 10+)
+- Manufacturer restrictions
+
+If it doesn't work, check the logs for errors.
+
+### Why isn't my phone discoverable for Bluetooth audio?
+If `ENABLE_BT_AUDIO_SINK=1` but your phone isn't discoverable:
+1. Ensure you're in car (WIRED or WIRELESS mode)
+2. Check that Bluetooth is enabled
+3. Look for "BT Audio Sink" messages in logs
+4. Try toggling Bluetooth off/on manually
+5. Your device may not support A2DP sink mode
+
+### Can I use Bluetooth audio sink in IDLE mode?
+No, the feature is automatically disabled in IDLE mode to save battery. It only works when connected to your car (WIRED or WIRELESS mode).
+
 ---
 
 ## Troubleshooting
