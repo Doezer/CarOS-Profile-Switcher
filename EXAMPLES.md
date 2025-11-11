@@ -139,9 +139,10 @@ ENABLE_BT_AUDIO_SINK=0
 VERBOSE=1
 ```
 
-### Bluetooth Audio Streaming Enabled
+### Audio Streaming via Bluetooth
 ```bash
 # Enable receiving audio from another phone via Bluetooth
+# Note: May not work if Bluetooth is used for car audio even in wired mode
 AUDI_BT_NAMES="Your Car"
 AUDI_BT_MAC=""
 ALLOW_BT_IN_WIRED=1           # Must keep BT on for audio streaming
@@ -154,6 +155,28 @@ KEEP_WIFI_IN_WIRED=0
 KEEP_WIFI_IN_IDLE=1
 AUTO_GRANT_PERMISSIONS=1
 ENABLE_BT_AUDIO_SINK=1        # Enable Bluetooth audio sink mode
+ENABLE_WIFI_AUDIO_HOTSPOT=0
+VERBOSE=1
+```
+
+### Audio Streaming via WiFi Hotspot (Recommended)
+```bash
+# Enable WiFi hotspot for audio streaming (works even if BT used for car audio)
+AUDI_BT_NAMES="Your Car"
+AUDI_BT_MAC=""
+ALLOW_BT_IN_WIRED=1
+DATA_OFF_OUTSIDE=1
+KEEP_DATA_IN_CAR=1
+IDLE_MAX_CPU_FREQ=""
+LIMIT_QUICK_CHARGE_WIRED=1
+SET_NOVA_DEFAULT=1
+KEEP_WIFI_IN_WIRED=1          # WiFi must be on for hotspot
+KEEP_WIFI_IN_IDLE=1
+AUTO_GRANT_PERMISSIONS=1
+ENABLE_BT_AUDIO_SINK=0
+ENABLE_WIFI_AUDIO_HOTSPOT=1  # Enable WiFi hotspot for audio streaming
+WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
+WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
 VERBOSE=1
 ```
 

@@ -130,38 +130,51 @@ In wired mode, the module tries to reduce fast charging to prevent phone overhea
 ### Does Nova Launcher need to be installed?
 No. If `SET_NOVA_DEFAULT=1` but Nova isn't installed, the module just skips this step. No errors.
 
-### How does Bluetooth audio sink work?
-When `ENABLE_BT_AUDIO_SINK=1`, your CarOS phone becomes discoverable and can receive audio from another phone via Bluetooth. The audio is automatically played through your car speakers via Android Auto.
+### How does audio streaming work?
+CarOS supports two methods for streaming audio from another phone:
 
-**⚠️ Important: Only works in WIRED mode** (USB connection). In wireless mode, Bluetooth is already being used to connect to your car.
+**Method 1: Bluetooth A2DP Sink**
+When `ENABLE_BT_AUDIO_SINK=1`, your CarOS phone becomes discoverable and can receive audio from another phone via Bluetooth.
 
-**To use:**
-1. Enable in config: `ENABLE_BT_AUDIO_SINK=1`
-2. Connect your CarOS phone to Android Auto **via USB (wired mode)**
-3. Pair the emitting phone with your CarOS device via Bluetooth
-4. Play music on the emitting phone - it will stream to your car!
+**Limitation:** May not work if Bluetooth is already used for car audio/calls, even in wired mode.
+
+**Method 2: WiFi Hotspot (Recommended)**
+When `ENABLE_WIFI_AUDIO_HOTSPOT=1`, your CarOS device creates a WiFi hotspot that other devices can connect to for streaming audio.
+
+**Advantages:** Works even when Bluetooth is used by the car. Requires an audio streaming app on the emitting phone.
+
+**To use WiFi hotspot:**
+1. Enable in config: `ENABLE_WIFI_AUDIO_HOTSPOT=1`
+2. Set SSID and password: `WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"`
+3. Connect to car via USB (wired mode)
+4. Emitting phone connects to WiFi hotspot
+5. Use audio streaming app (SoundWire, AudioRelay, etc.)
 
 ### Does Bluetooth audio sink work on all devices?
-No, it's device-dependent. Some Android devices don't support A2DP sink mode. The module will try to enable it, but success depends on:
-- Device hardware support
-- Android version (works better on Android 10+)
-- Manufacturer restrictions
+No, it's device-dependent. Some Android devices don't support A2DP sink mode. Additionally, even in wired mode, many cars use Bluetooth for audio and phone calls, which prevents the phone from acting as an A2DP sink simultaneously.
 
-If it doesn't work, check the logs for errors.
+**If Bluetooth doesn't work:** Use the WiFi hotspot method instead (`ENABLE_WIFI_AUDIO_HOTSPOT=1`).
 
 ### Why isn't my phone discoverable for Bluetooth audio?
 If `ENABLE_BT_AUDIO_SINK=1` but your phone isn't discoverable:
-1. **Make sure you're using WIRED mode** (USB connection, not wireless)
-2. Check that Bluetooth is enabled
-3. Look for "BT Audio Sink" messages in logs
-4. Try toggling Bluetooth off/on manually
+1. **Bluetooth may be in use by the car** - Even in wired mode, many cars use Bluetooth for audio/calls
+2. **Try WiFi hotspot instead** - Set `ENABLE_WIFI_AUDIO_HOTSPOT=1`
+3. Check that you're in WIRED mode (USB connection)
+4. Look for "BT Audio Sink" messages in logs
 5. Your device may not support A2DP sink mode
 
-### Can I use Bluetooth audio sink in IDLE mode?
-No, the feature is automatically disabled in IDLE mode to save battery. It only works when connected to your car in WIRED mode (USB connection).
+### Can I use audio streaming in IDLE mode?
+No, both features are automatically disabled in IDLE mode to save battery. They only work when connected to your car in WIRED mode.
 
-### Can I use Bluetooth audio sink in WIRELESS mode?
-No, in wireless mode your phone's Bluetooth is already being used to connect to the car for Android Auto. Bluetooth can't simultaneously connect to the car AND act as an audio receiver for another phone. The feature only works in WIRED mode where the car connection is via USB, leaving Bluetooth free for audio streaming.
+### Can I use audio streaming in WIRELESS mode?
+No, in wireless mode both Bluetooth and WiFi are typically used by the car for Android Auto connection. The audio streaming features only work in WIRED mode where the car connection is via USB.
+
+### What audio streaming apps work with WiFi hotspot?
+Popular options include:
+- **SoundWire** (free) - Low latency audio streaming
+- **AudioRelay** (free) - WiFi/USB audio streaming
+- **AirMusic** - DLNA/UPnP streaming
+- Any app that supports streaming to a WiFi network
 
 ---
 
