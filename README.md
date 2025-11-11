@@ -20,6 +20,7 @@ A Magisk module for Android that automatically switches device profiles based on
 - **Battery Saver**: Automatically enable when not in car
 - **Nova Launcher**: Set as default launcher automatically
 - **🔔 Auto Permissions**: Automatically grants notification and location permissions to Android Auto, Waze, Google Maps, and Nova Launcher
+- **🎵 Audio Streaming**: Stream audio from another device to car speakers via Bluetooth A2DP sink or WiFi hotspot
 
 ### Configuration
 - User-configurable via `/sdcard/CarOS/config.env`
@@ -79,9 +80,67 @@ KEEP_WIFI_IN_IDLE=1       # Keep WiFi on when idle
 # Automatic permission management
 AUTO_GRANT_PERMISSIONS=1  # Auto-grant notifications & location to AA, Waze, Maps
 
+# Audio streaming options (choose one or both based on what works for your setup)
+ENABLE_BT_AUDIO_SINK=0     # Bluetooth A2DP sink (may not work if BT used for car audio)
+ENABLE_WIFI_AUDIO_HOTSPOT=0  # WiFi hotspot for audio streaming (alternative to BT)
+
+# WiFi hotspot settings (if using WiFi audio streaming)
+WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
+WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
+
 # Verbose logging
 VERBOSE=1
 ```
+
+## 🎵 Audio Streaming Feature
+
+Stream audio from another phone to your car speakers via Bluetooth or WiFi. Two methods available:
+
+### Method 1: Bluetooth A2DP Sink
+When enabled (`ENABLE_BT_AUDIO_SINK=1`), your CarOS device can receive audio from another phone via Bluetooth.
+
+**Limitation:** May not work if Bluetooth is already used for car audio/calls (even in wired mode).
+
+**How to use:**
+1. Enable in config: `ENABLE_BT_AUDIO_SINK=1`
+2. Connect your CarOS phone to car via USB
+3. On the emitting phone:
+   - Go to Bluetooth settings
+   - Find and pair with your CarOS device
+   - Connect and play music
+
+### Method 2: WiFi Hotspot (Recommended Alternative)
+When enabled (`ENABLE_WIFI_AUDIO_HOTSPOT=1`), your CarOS device creates a WiFi hotspot that other devices can connect to for streaming audio.
+
+**Advantages:**
+- ✓ Works even if Bluetooth is used for car audio
+- ✓ Higher quality audio streaming
+- ✓ Can work in WIRED mode when WiFi is not used by the car
+
+**How to use:**
+1. Enable in config:
+   ```bash
+   ENABLE_WIFI_AUDIO_HOTSPOT=1
+   WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
+   WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
+   ```
+2. Connect your CarOS phone to car via USB
+3. On the emitting phone:
+   - Connect to the WiFi hotspot (SSID: CarOS-Audio)
+   - Use an audio streaming app (e.g., SoundWire, AudioRelay, etc.)
+   - Stream audio to CarOS device
+
+### Use Cases
+- Stream music from a passenger's phone to your car speakers
+- Multiple people can share music during the drive
+- Alternative to passing phone cables around
+
+### Important Notes
+- **Both methods work in WIRED mode only** (USB connection to car)
+- Does NOT work in WIRELESS mode (both Bluetooth and WiFi may be used by car)
+- Automatically disabled when IDLE to save battery
+- WiFi hotspot method requires an audio streaming app on the emitting phone
+- Bluetooth method may not work on all devices (A2DP sink support required)
 
 ## 📝 How It Works
 

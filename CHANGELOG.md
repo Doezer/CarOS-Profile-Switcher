@@ -4,6 +4,21 @@ All notable changes to CarOS Profile Switcher will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **🎵 Audio Streaming Feature**: Stream audio from another device to car speakers via two methods:
+  - **Bluetooth A2DP Sink** (`ENABLE_BT_AUDIO_SINK`): Receive audio via Bluetooth
+    - May not work if Bluetooth is used for car audio even in wired mode
+    - Device becomes discoverable for pairing
+    - Automatic A2DP sink mode configuration
+  - **WiFi Hotspot** (`ENABLE_WIFI_AUDIO_HOTSPOT`): Create WiFi hotspot for audio streaming
+    - Recommended alternative when Bluetooth is occupied by car
+    - Works in WIRED mode when WiFi is not used by car
+    - Configurable SSID and password
+    - Requires audio streaming app on emitting device (SoundWire, AudioRelay, etc.)
+  - Both methods only work in WIRED mode (USB connection)
+  - Automatically disable in IDLE mode to save battery
+  - Comprehensive documentation in README.md, EXAMPLES.md, and FAQ.md
+
 ### Planned
 - Improved error handling in service.sh
 

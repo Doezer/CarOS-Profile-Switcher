@@ -38,6 +38,22 @@ DEFAULT_KEEP_WIFI_IN_IDLE=0
 # Automatically grants necessary permissions for Android Auto, Waze, Maps, etc.
 DEFAULT_AUTO_GRANT_PERMISSIONS=1
 
+# Bluetooth audio streaming (enable device as A2DP sink to receive audio from another phone)
+# When enabled, the phone becomes discoverable and can receive audio from another device
+# Note: May not work if Bluetooth is used for car audio even in wired mode
+DEFAULT_ENABLE_BT_AUDIO_SINK=0
+
+# WiFi hotspot for audio streaming (alternative to Bluetooth)
+# Creates a WiFi hotspot that other devices can connect to for streaming audio
+# Works when WiFi is not used by the car (typically in wired mode)
+DEFAULT_ENABLE_WIFI_AUDIO_HOTSPOT=0
+
+# WiFi hotspot SSID for audio streaming
+DEFAULT_WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
+
+# WiFi hotspot password for audio streaming (min 8 characters)
+DEFAULT_WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
+
 # Verbose logs
 DEFAULT_VERBOSE=1
 
@@ -80,6 +96,17 @@ KEEP_WIFI_IN_IDLE=$DEFAULT_KEEP_WIFI_IN_IDLE
 # Automatic permission management (notifications and location)
 AUTO_GRANT_PERMISSIONS=$DEFAULT_AUTO_GRANT_PERMISSIONS
 
+# Bluetooth audio streaming (enable device as A2DP sink to receive audio from another phone)
+# Note: May not work if Bluetooth is used for car audio even in wired mode
+ENABLE_BT_AUDIO_SINK=$DEFAULT_ENABLE_BT_AUDIO_SINK
+
+# WiFi hotspot for audio streaming (alternative to Bluetooth)
+ENABLE_WIFI_AUDIO_HOTSPOT=$DEFAULT_ENABLE_WIFI_AUDIO_HOTSPOT
+
+# WiFi hotspot SSID and password
+WIFI_AUDIO_HOTSPOT_SSID="$DEFAULT_WIFI_AUDIO_HOTSPOT_SSID"
+WIFI_AUDIO_HOTSPOT_PASSWORD="$DEFAULT_WIFI_AUDIO_HOTSPOT_PASSWORD"
+
 # Verbose logs
 VERBOSE=$DEFAULT_VERBOSE
 EOF
@@ -98,5 +125,9 @@ apply_defaults() {
   : "${KEEP_WIFI_IN_WIRED:=$DEFAULT_KEEP_WIFI_IN_WIRED}"
   : "${KEEP_WIFI_IN_IDLE:=$DEFAULT_KEEP_WIFI_IN_IDLE}"
   : "${AUTO_GRANT_PERMISSIONS:=$DEFAULT_AUTO_GRANT_PERMISSIONS}"
+  : "${ENABLE_BT_AUDIO_SINK:=$DEFAULT_ENABLE_BT_AUDIO_SINK}"
+  : "${ENABLE_WIFI_AUDIO_HOTSPOT:=$DEFAULT_ENABLE_WIFI_AUDIO_HOTSPOT}"
+  : "${WIFI_AUDIO_HOTSPOT_SSID:=$DEFAULT_WIFI_AUDIO_HOTSPOT_SSID}"
+  : "${WIFI_AUDIO_HOTSPOT_PASSWORD:=$DEFAULT_WIFI_AUDIO_HOTSPOT_PASSWORD}"
   : "${VERBOSE:=$DEFAULT_VERBOSE}"
 }
