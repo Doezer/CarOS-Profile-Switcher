@@ -9,7 +9,7 @@ STATEFILE=/data/adb/modules/caros-switcher/state.json
 
 # Rotate logs if > 1MB
 if [ -f "$LOGFILE" ] && [ "$(stat -c%s "$LOGFILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
-  mv "$LOGFILE" "${LOGFILE}.old" 2>/dev/null
+    mv "$LOGFILE" "${LOGFILE}.old" 2>/dev/null
 fi
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $@" >> "$LOGFILE"; }
@@ -17,11 +17,11 @@ error_log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $@" >> "$LOGFILE"; }
 
 # Create configuration if it doesn't exist
 if [ ! -f "$CONFFILE" ]; then
-  mkdir -p "$(dirname "$CONFFILE")"
-  log "Creating config file: $CONFFILE"
-  generate_user_config > "$CONFFILE"
-  chmod 644 "$CONFFILE"
-  log "Config file created successfully"
+    mkdir -p "$(dirname "$CONFFILE")"
+    log "Creating config file: $CONFFILE"
+    generate_user_config > "$CONFFILE"
+    chmod 644 "$CONFFILE"
+    log "Config file created successfully"
 fi
 
 [ -f "$CONFFILE" ] && . "$CONFFILE"
@@ -31,64 +31,141 @@ apply_defaults
 
 vlog(){ [ "$VERBOSE" = "1" ] && log "[DBG]" "$@"; }
 
-wifi_on(){ 
-  cmd wifi set-wifi-enabled enabled 2>/dev/null || svc wifi enable 2>/dev/null || {
-    settings put global wifi_on 1 2>/dev/null || error_log "Failed to enable WiFi"
-  }
+wifi_on(){
+    cmd wifi set-wifi-enabled enabled 2>/dev/null || svc wifi enable 2>/dev/null || {
+        settings put global wifi_on 1 2>/dev/null || error_log "Failed to enable WiFi"
+    }
 }
-wifi_off(){ 
-  cmd wifi set-wifi-enabled disabled 2>/dev/null || svc wifi disable 2>/dev/null || {
-    settings put global wifi_on 0 2>/dev/null || error_log "Failed to disable WiFi"
-  }
+wifi_off(){
+    cmd wifi set-wifi-enabled disabled 2>/dev/null || svc wifi disable 2>/dev/null || {
+        settings put global wifi_on 0 2>/dev/null || error_log "Failed to disable WiFi"
+    }
 }
-data_on(){ 
-  settings put global mobile_data 1 2>/dev/null || svc data enable 2>/dev/null || error_log "Failed to enable mobile data"
+
+data_on(){
+    log "Enabling mobile data..."
+    
+    # Method 1: Modern Android (11+)
+    cmd telephony data enable 2>/dev/null || {
+        # Method 2: Settings + svc fallback
+        settings put global mobile_data 1 2>/dev/null
+        svc data enable 2>/dev/null
+    }
+    
+    # Ensure mobile radio is on
+    settings put global airplane_mode_on 0 2>/dev/null
+    
+    # Force data connection reestablishment
+    cmd phone data connection-state true 2>/dev/null
+    
+    # Wait briefly for radio to initialize
+    sleep 1
+    
+    # Trigger data connection through telephony service
+    service call phone 27 i32 1 2>/dev/null || {
+        service call phone 34 i32 1 2>/dev/null
+    }
+    
+    # Verify data is enabled
+    DATA_STATE=$(settings get global mobile_data 2>/dev/null)
+    if [ "$DATA_STATE" != "1" ]; then
+        error_log "Failed to enable mobile data - state: $DATA_STATE"
+        return 1
+    fi
+    
+    vlog "Mobile data enabled successfully"
+    return 0
 }
-data_off(){ 
-  settings put global mobile_data 0 2>/dev/null || svc data disable 2>/dev/null || error_log "Failed to disable mobile data"
+
+data_off(){
+    log "Disabling mobile data..."
+    
+    # Method 1: Modern Android (11+)
+    cmd telephony data disable 2>/dev/null || {
+        # Method 2: Settings + svc fallback
+        settings put global mobile_data 0 2>/dev/null
+        svc data disable 2>/dev/null
+    }
+    
+    # Verify data is disabled
+    DATA_STATE=$(settings get global mobile_data 2>/dev/null)
+    if [ "$DATA_STATE" != "0" ]; then
+        error_log "Failed to disable mobile data - state: $DATA_STATE"
+    fi
+    
+    vlog "Mobile data disabled"
 }
-bt_on(){ 
-  cmd bluetooth enable >/dev/null 2>&1 || settings put global bluetooth_on 1 >/dev/null 2>&1 || {
-    service call bluetooth_manager 6 >/dev/null 2>&1 || error_log "Failed to enable Bluetooth"
-  }
+
+check_data_connection(){
+    [ "$VERBOSE" != "1" ] && return 0
+    
+    # Check mobile data state
+    DATA_ENABLED=$(settings get global mobile_data 2>/dev/null)
+    vlog "Mobile data setting: $DATA_ENABLED"
+    
+    # Check if SIM is present and active
+    SIM_STATE=$(getprop gsm.sim.state 2>/dev/null)
+    vlog "SIM state: $SIM_STATE"
+    
+    # Check data connection state
+    DATA_CONN=$(dumpsys telephony.registry 2>/dev/null | grep "mDataConnectionState" | head -1)
+    vlog "Data connection: $DATA_CONN"
+    
+    # Check APN settings
+    APN_INFO=$(dumpsys telephony.registry 2>/dev/null | grep -i "apn" | head -3)
+    vlog "APN info: $APN_INFO"
+    
+    # Check if we have an IP address
+    IP_INFO=$(ip addr show rmnet_data0 2>/dev/null || ip addr show rmnet0 2>/dev/null)
+    if [ -n "$IP_INFO" ]; then
+        vlog "Data interface has IP address"
+    else
+        vlog "WARNING: No IP address on data interface"
+    fi
 }
-bt_off(){ 
-  cmd bluetooth disable >/dev/null 2>&1 || settings put global bluetooth_on 0 >/dev/null 2>&1 || {
-    service call bluetooth_manager 8 >/dev/null 2>&1 || error_log "Failed to disable Bluetooth"
-  }
+
+bt_on(){
+    cmd bluetooth enable >/dev/null 2>&1 || settings put global bluetooth_on 1 >/dev/null 2>&1 || {
+        service call bluetooth_manager 6 >/dev/null 2>&1 || error_log "Failed to enable Bluetooth"
+    }
+}
+bt_off(){
+    cmd bluetooth disable >/dev/null 2>&1 || settings put global bluetooth_on 0 >/dev/null 2>&1 || {
+        service call bluetooth_manager 8 >/dev/null 2>&1 || error_log "Failed to disable Bluetooth"
+    }
 }
 
 battery_saver_on(){ settings put global low_power 1 || error_log "Failed to enable battery saver"; }
 battery_saver_off(){ settings put global low_power 0 || error_log "Failed to disable battery saver"; }
 
 set_cpu_max(){
-  MAX="$1"
-  if [ -n "$MAX" ]; then
-    SUCCESS=0
-    for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-      if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
-        echo "$MAX" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
-      fi
-    done
-    [ "$SUCCESS" = "0" ] && error_log "Failed to set CPU max frequency to $MAX"
-  fi
+    MAX="$1"
+    if [ -n "$MAX" ]; then
+        SUCCESS=0
+        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+            if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
+                echo "$MAX" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
+            fi
+        done
+        [ "$SUCCESS" = "0" ] && error_log "Failed to set CPU max frequency to $MAX"
+    fi
 }
 reset_cpu_max(){
-  SUCCESS=0
-  for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-    if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -e "$cpu/cpufreq/cpuinfo_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
-      cat "$cpu/cpufreq/cpuinfo_max_freq" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
-    fi
-  done
-  [ "$SUCCESS" = "0" ] && error_log "Failed to reset CPU max frequency"
+    SUCCESS=0
+    for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+        if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -e "$cpu/cpufreq/cpuinfo_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
+            cat "$cpu/cpufreq/cpuinfo_max_freq" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
+        fi
+    done
+    [ "$SUCCESS" = "0" ] && error_log "Failed to reset CPU max frequency"
 }
 
 screen_off(){ input keyevent 26 >/dev/null 2>&1; }
 screen_on(){ input keyevent 224 >/dev/null 2>&1 || input keyevent 82 >/dev/null 2>&1; }
 
 charge_limit_on(){
-  SUCCESS=0
-  for n in \
+    SUCCESS=0
+    for n in \
     /sys/class/power_supply/battery/charging_enabled \
     /sys/class/power_supply/battery/charge_enabled \
     /sys/class/power_supply/battery/charge_disable \
@@ -96,23 +173,23 @@ charge_limit_on(){
     /sys/class/power_supply/usb/input_current_limit \
     /sys/class/power_supply/battery/constant_charge_current_max \
     ; do
-    if [ -e "$n" ] && [ -w "$n" ]; then
-      case "$n" in
-        */input_current_limit|*/constant_charge_current_max)
-          echo 500000 > "$n" 2>/dev/null && SUCCESS=1 ;;
-        *charging_enabled|*charge_enabled)
-          echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
-        *charge_disable|*input_suspend)
-          echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
-      esac
-    fi
-  done
-  [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
-  return $((1-SUCCESS))
+        if [ -e "$n" ] && [ -w "$n" ]; then
+            case "$n" in
+                */input_current_limit|*/constant_charge_current_max)
+                echo 500000 > "$n" 2>/dev/null && SUCCESS=1 ;;
+                *charging_enabled|*charge_enabled)
+                echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
+                *charge_disable|*input_suspend)
+                echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
+            esac
+        fi
+    done
+    [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
+    return $((1-SUCCESS))
 }
 charge_limit_off(){
-  SUCCESS=0
-  for n in \
+    SUCCESS=0
+    for n in \
     /sys/class/power_supply/battery/charging_enabled \
     /sys/class/power_supply/battery/charge_enabled \
     /sys/class/power_supply/battery/charge_disable \
@@ -120,247 +197,265 @@ charge_limit_off(){
     /sys/class/power_supply/usb/input_current_limit \
     /sys/class/power_supply/battery/constant_charge_current_max \
     ; do
-    if [ -e "$n" ] && [ -w "$n" ]; then
-      case "$n" in
-        */input_current_limit|*/constant_charge_current_max)
-          echo 3000000 > "$n" 2>/dev/null && SUCCESS=1 ;;
-        *charging_enabled|*charge_enabled)
-          echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
-        *charge_disable|*input_suspend)
-          echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
-      esac
-    fi
-  done
-  [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
-  return 0
+        if [ -e "$n" ] && [ -w "$n" ]; then
+            case "$n" in
+                */input_current_limit|*/constant_charge_current_max)
+                echo 3000000 > "$n" 2>/dev/null && SUCCESS=1 ;;
+                *charging_enabled|*charge_enabled)
+                echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
+                *charge_disable|*input_suspend)
+                echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
+            esac
+        fi
+    done
+    [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
+    return 0
 }
 
 set_nova_default(){
-  [ "$SET_NOVA_DEFAULT" = "1" ] || return 0
-  
-  # Vérifier si Nova Launcher est installé
-  if ! pm list packages | grep -q "com.teslacoilsw.launcher"; then
-    vlog "Nova Launcher not installed, skipping default launcher setup"
-    return 1
-  fi
-  
-  # Définir Nova Launcher comme launcher par défaut
-  if cmd package set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
-    vlog "Nova Launcher set as default launcher"
-    return 0
-  elif pm set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
-    vlog "Nova Launcher set as default launcher (fallback method)"
-    return 0
-  else
-    # Méthode alternative avec settings
-    settings put secure default_input_method com.teslacoilsw.launcher >/dev/null 2>&1
-    vlog "Nova Launcher setup attempted via settings"
-    return 0
-  fi
+    [ "$SET_NOVA_DEFAULT" = "1" ] || return 0
+    
+    # Vérifier si Nova Launcher est installé
+    if ! pm list packages | grep -q "com.teslacoilsw.launcher"; then
+        vlog "Nova Launcher not installed, skipping default launcher setup"
+        return 1
+    fi
+    
+    # Définir Nova Launcher comme launcher par défaut
+    if cmd package set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
+        vlog "Nova Launcher set as default launcher"
+        return 0
+        elif pm set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
+        vlog "Nova Launcher set as default launcher (fallback method)"
+        return 0
+    else
+        # Méthode alternative avec settings
+        settings put secure default_input_method com.teslacoilsw.launcher >/dev/null 2>&1
+        vlog "Nova Launcher setup attempted via settings"
+        return 0
+    fi
 }
 
 # Enable Bluetooth audio sink mode (A2DP sink)
 enable_bt_audio_sink(){
-  [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
-  
-  vlog "Enabling Bluetooth audio sink mode"
-  
-  # Ensure Bluetooth is on
-  bt_on
-  sleep 1
-  
-  # Make device discoverable for pairing
-  # Timeout 0 means stay discoverable indefinitely while in car
-  settings put global bluetooth_discoverable_timeout 0 2>/dev/null
-  
-  # Enable Bluetooth discoverability via dumpsys
-  cmd bluetooth_manager enable 2>/dev/null
-  cmd bluetooth_manager set-discoverability on 2>/dev/null || {
-    # Fallback method
-    settings put global bluetooth_on 1 2>/dev/null
-  }
-  
-  # Try to enable A2DP sink mode via system properties
-  setprop persist.bluetooth.a2dp_sink.enabled true 2>/dev/null
-  setprop bluetooth.a2dp.sink.enabled true 2>/dev/null
-  
-  # Try to set Bluetooth class to audio sink
-  setprop bluetooth.device.class 0x240404 2>/dev/null
-  
-  # Enable audio routing to main speaker for Bluetooth audio
-  # This ensures incoming Bluetooth audio plays through system audio
-  settings put system bluetooth_audio_output 0 2>/dev/null
-  
-  vlog "Bluetooth audio sink mode enabled - device should be discoverable"
-  log "BT Audio Sink: Device is now discoverable for audio streaming"
+    [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
+    
+    vlog "Enabling Bluetooth audio sink mode"
+    
+    # Ensure Bluetooth is on
+    bt_on
+    sleep 1
+    
+    # Make device discoverable for pairing
+    # Timeout 0 means stay discoverable indefinitely while in car
+    settings put global bluetooth_discoverable_timeout 0 2>/dev/null
+    
+    # Enable Bluetooth discoverability via dumpsys
+    cmd bluetooth_manager enable 2>/dev/null
+    cmd bluetooth_manager set-discoverability on 2>/dev/null || {
+        # Fallback method
+        settings put global bluetooth_on 1 2>/dev/null
+    }
+    
+    # Try to enable A2DP sink mode via system properties
+    setprop persist.bluetooth.a2dp_sink.enabled true 2>/dev/null
+    setprop bluetooth.a2dp.sink.enabled true 2>/dev/null
+    
+    # Try to set Bluetooth class to audio sink
+    setprop bluetooth.device.class 0x240404 2>/dev/null
+    
+    # Enable audio routing to main speaker for Bluetooth audio
+    # This ensures incoming Bluetooth audio plays through system audio
+    settings put system bluetooth_audio_output 0 2>/dev/null
+    
+    vlog "Bluetooth audio sink mode enabled - device should be discoverable"
+    log "BT Audio Sink: Device is now discoverable for audio streaming"
 }
 
 # Disable Bluetooth audio sink mode
 disable_bt_audio_sink(){
-  [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
-  
-  vlog "Disabling Bluetooth audio sink mode"
-  
-  # Disable discoverability to save battery when not in car
-  settings put global bluetooth_discoverable_timeout 120 2>/dev/null
-  cmd bluetooth_manager set-discoverability off 2>/dev/null
-  
-  # Disable A2DP sink mode
-  setprop persist.bluetooth.a2dp_sink.enabled false 2>/dev/null
-  setprop bluetooth.a2dp.sink.enabled false 2>/dev/null
-  
-  # Reset Bluetooth class to default (phone)
-  setprop bluetooth.device.class 0x5A020C 2>/dev/null
-  
-  vlog "Bluetooth audio sink mode disabled"
+    [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
+    
+    vlog "Disabling Bluetooth audio sink mode"
+    
+    # Disable discoverability to save battery when not in car
+    settings put global bluetooth_discoverable_timeout 120 2>/dev/null
+    cmd bluetooth_manager set-discoverability off 2>/dev/null
+    
+    # Disable A2DP sink mode
+    setprop persist.bluetooth.a2dp_sink.enabled false 2>/dev/null
+    setprop bluetooth.a2dp.sink.enabled false 2>/dev/null
+    
+    # Reset Bluetooth class to default (phone)
+    setprop bluetooth.device.class 0x5A020C 2>/dev/null
+    
+    vlog "Bluetooth audio sink mode disabled"
 }
 
 # Enable WiFi hotspot for audio streaming
 enable_wifi_audio_hotspot(){
-  [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
-  
-  vlog "Enabling WiFi hotspot for audio streaming"
-  
-  # Ensure WiFi is on
-  wifi_on
-  sleep 1
-  
-  # Stop any existing hotspot
-  cmd wifi stop-softap 2>/dev/null
-  sleep 1
-  
-  # Start WiFi hotspot with configured SSID and password
-  # Method 1: Using cmd wifi (Android 11+)
-  cmd wifi start-softap "$WIFI_AUDIO_HOTSPOT_SSID" wpa2-psk "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null || {
-    # Method 2: Using settings (fallback)
-    settings put global wifi_ap_ssid "$WIFI_AUDIO_HOTSPOT_SSID" 2>/dev/null
-    settings put global wifi_ap_passwd "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null
-    svc wifi enable 2>/dev/null
-  }
-  
-  vlog "WiFi hotspot enabled - SSID: $WIFI_AUDIO_HOTSPOT_SSID"
-  log "WiFi Audio Hotspot: Enabled for audio streaming (SSID: $WIFI_AUDIO_HOTSPOT_SSID)"
+    [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
+    
+    vlog "Enabling WiFi hotspot for audio streaming"
+    
+    # Ensure WiFi is on
+    wifi_on
+    sleep 1
+    
+    # Stop any existing hotspot
+    cmd wifi stop-softap 2>/dev/null
+    sleep 1
+    
+    # Start WiFi hotspot with configured SSID and password
+    # Method 1: Using cmd wifi (Android 11+)
+    cmd wifi start-softap "$WIFI_AUDIO_HOTSPOT_SSID" wpa2-psk "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null || {
+        # Method 2: Using settings (fallback)
+        settings put global wifi_ap_ssid "$WIFI_AUDIO_HOTSPOT_SSID" 2>/dev/null
+        settings put global wifi_ap_passwd "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null
+        svc wifi enable 2>/dev/null
+    }
+    
+    vlog "WiFi hotspot enabled - SSID: $WIFI_AUDIO_HOTSPOT_SSID"
+    log "WiFi Audio Hotspot: Enabled for audio streaming (SSID: $WIFI_AUDIO_HOTSPOT_SSID)"
 }
 
 # Disable WiFi hotspot for audio streaming
 disable_wifi_audio_hotspot(){
-  [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
-  
-  vlog "Disabling WiFi hotspot for audio streaming"
-  
-  # Stop WiFi hotspot
-  cmd wifi stop-softap 2>/dev/null || {
-    settings put global wifi_ap_ssid "" 2>/dev/null
-  }
-  
-  vlog "WiFi hotspot disabled"
+    [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
+    
+    vlog "Disabling WiFi hotspot for audio streaming"
+    
+    # Stop WiFi hotspot
+    cmd wifi stop-softap 2>/dev/null || {
+        settings put global wifi_ap_ssid "" 2>/dev/null
+    }
+    
+    vlog "WiFi hotspot disabled"
 }
 
 usb_connected(){
-  if [ -f /sys/class/power_supply/usb/online ] && [ "$(cat /sys/class/power_supply/usb/online 2>/dev/null)" = "1" ]; then
-    return 0
-  fi
-  dumpsys usb 2>/dev/null | grep -q "mConnected=true" && return 0
-  return 1
+    if [ -f /sys/class/power_supply/usb/online ] && [ "$(cat /sys/class/power_supply/usb/online 2>/dev/null)" = "1" ]; then
+        return 0
+    fi
+    dumpsys usb 2>/dev/null | grep -q "mConnected=true" && return 0
+    return 1
 }
 
 aa_process_active(){
-  # Cache to avoid repeated calls
-  if [ -n "$AA_CACHE" ] && [ $(($(date +%s) - AA_CACHE_TIME)) -lt 2 ]; then
-    [ "$AA_CACHE" = "1" ] && return 0 || return 1
-  fi
-  
-  AA_CACHE_TIME=$(date +%s)
-  if pidof com.google.android.projection.gearhead >/dev/null 2>&1; then
-    AA_CACHE=1
-    return 0
-  fi
-  
-  if dumpsys activity services 2>/dev/null | grep -qi com.google.android.projection.gearhead; then
-    AA_CACHE=1
-    return 0
-  fi
-  
-  AA_CACHE=0
-  return 1
+    # Cache to avoid repeated calls
+    if [ -n "$AA_CACHE" ] && [ $(($(date +%s) - AA_CACHE_TIME)) -lt 2 ]; then
+        [ "$AA_CACHE" = "1" ] && return 0 || return 1
+    fi
+    
+    AA_CACHE_TIME=$(date +%s)
+    if pidof com.google.android.projection.gearhead >/dev/null 2>&1; then
+        AA_CACHE=1
+        return 0
+    fi
+    
+    if dumpsys activity services 2>/dev/null | grep -qi com.google.android.projection.gearhead; then
+        AA_CACHE=1
+        return 0
+    fi
+    
+    AA_CACHE=0
+    return 1
 }
 
 bt_connected_to_audi(){
-  # Quick check with cache
-  if [ -n "$BT_CACHE" ] && [ $(($(date +%s) - BT_CACHE_TIME)) -lt 5 ]; then
-    [ "$BT_CACHE" = "1" ] && return 0 || return 1
-  fi
-  
-  BT_CACHE_TIME=$(date +%s)
-  
-  # Escape special characters in AUDI_BT_NAMES
-  ESCAPED_NAMES="$(echo "$AUDI_BT_NAMES" | sed 's/[].[^$\\/*]/\\&/g')"
-  
-  # Quick attempt with dumpsys
-  if DUMP="$(dumpsys bluetooth_manager 2>/dev/null | head -100)"; then
-    # Check by MAC if specified
-    if [ -n "$AUDI_BT_MAC" ]; then
-      if echo "$DUMP" | grep -i "$AUDI_BT_MAC" | grep -qi "Connected.*true\|State.*Connected"; then
-        BT_CACHE=1
-        return 0
-      fi
+    # Quick check with cache
+    if [ -n "$BT_CACHE" ] && [ $(($(date +%s) - BT_CACHE_TIME)) -lt 5 ]; then
+        [ "$BT_CACHE" = "1" ] && return 0 || return 1
     fi
     
-    # Check by name
-    if echo "$DUMP" | grep -Eiq "Name:.*($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected.*true\|State.*Connected"; then
-      BT_CACHE=1
-      return 0
+    BT_CACHE_TIME=$(date +%s)
+    
+    # Escape special characters in AUDI_BT_NAMES
+    ESCAPED_NAMES="$(echo "$AUDI_BT_NAMES" | sed 's/[].[^$\\/*]/\\&/g')"
+    
+    # Quick attempt with dumpsys
+    if DUMP="$(dumpsys bluetooth_manager 2>/dev/null | head -100)"; then
+        # Check by MAC if specified
+        if [ -n "$AUDI_BT_MAC" ]; then
+            if echo "$DUMP" | grep -i "$AUDI_BT_MAC" | grep -qi "Connected.*true\|State.*Connected"; then
+                BT_CACHE=1
+                return 0
+            fi
+        fi
+        
+        # Check by name
+        if echo "$DUMP" | grep -Eiq "Name:.*($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected.*true\|State.*Connected"; then
+            BT_CACHE=1
+            return 0
+        fi
+        
+        # Fallback: broader search
+        if echo "$DUMP" | grep -Eiq "($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected"; then
+            BT_CACHE=1
+            return 0
+        fi
+    else
+        vlog "Bluetooth dumpsys failed, assuming disconnected"
     fi
     
-    # Fallback: broader search
-    if echo "$DUMP" | grep -Eiq "($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected"; then
-      BT_CACHE=1
-      return 0
-    fi
-  else
-    vlog "Bluetooth dumpsys failed, assuming disconnected"
-  fi
-  
-  BT_CACHE=0
-  return 1
+    BT_CACHE=0
+    return 1
 }
 
 apply_wired_profile(){
-  if [ "$KEEP_DATA_IN_CAR" = "1" ]; then data_on; else data_off; fi
-  if [ "$ALLOW_BT_IN_WIRED" = "1" ]; then bt_on; else bt_off; fi
-  if [ "$KEEP_WIFI_IN_WIRED" = "1" ]; then wifi_on; else wifi_off; fi
-  battery_saver_off
-  reset_cpu_max
-  [ "$LIMIT_QUICK_CHARGE_WIRED" = "1" ] && charge_limit_on
-  set_nova_default
-  # Enable audio streaming (Bluetooth or WiFi hotspot based on config)
-  enable_bt_audio_sink
-  enable_wifi_audio_hotspot
-  screen_off
+    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
+      data_on
+      sleep 2  # Give data time to connect
+      check_data_connection
+    else 
+      data_off
+    fi    
+    if [ "$ALLOW_BT_IN_WIRED" = "1" ]; then bt_on; else bt_off; fi
+    if [ "$KEEP_WIFI_IN_WIRED" = "1" ]; then wifi_on; else wifi_off; fi
+    battery_saver_off
+    reset_cpu_max
+    [ "$LIMIT_QUICK_CHARGE_WIRED" = "1" ] && charge_limit_on
+    set_nova_default
+    # Enable audio streaming (Bluetooth or WiFi hotspot based on config)
+    enable_bt_audio_sink
+    enable_wifi_audio_hotspot
+    screen_off
 }
 
 apply_wireless_profile(){
-  bt_on
-  wifi_on
-  if [ "$KEEP_DATA_IN_CAR" = "1" ]; then data_on; else data_off; fi
-  battery_saver_off
-  reset_cpu_max
-  charge_limit_off
-  set_nova_default
-  # Note: BT audio sink NOT enabled in wireless mode because Bluetooth is already
-  # being used to connect to the car. WiFi may also be used by wireless AA.
-  # Audio streaming features disabled in wireless mode.
-  screen_off
+    bt_on
+    wifi_on
+    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
+      data_on
+      sleep 2  # Give data time to connect
+      check_data_connection
+    else 
+      data_off
+    fi
+    battery_saver_off
+    reset_cpu_max
+    charge_limit_off
+    set_nova_default
+    # Note: BT audio sink NOT enabled in wireless mode because Bluetooth is already
+    # being used to connect to the car. WiFi may also be used by wireless AA.
+    # Audio streaming features disabled in wireless mode.
+    screen_off
 }
 
 apply_idle_profile(){
-  if [ "$KEEP_WIFI_IN_IDLE" = "1" ]; then wifi_on; else wifi_off; fi
-  if [ "$DATA_OFF_OUTSIDE" = "1" ]; then data_off; else data_on; fi
-  battery_saver_on
-  set_cpu_max "$IDLE_MAX_CPU_FREQ"
-  charge_limit_off
-  disable_bt_audio_sink
-  disable_wifi_audio_hotspot
+    if [ "$KEEP_WIFI_IN_IDLE" = "1" ]; then wifi_on; else wifi_off; fi
+    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
+      data_on
+      sleep 2  # Give data time to connect
+      check_data_connection
+    else 
+      data_off
+    fi
+    battery_saver_on
+    set_cpu_max "$IDLE_MAX_CPU_FREQ"
+    charge_limit_off
+    disable_bt_audio_sink
+    disable_wifi_audio_hotspot
 }
 
 STATE=""
@@ -375,55 +470,55 @@ log "CarOS Profile Switcher service v0.2.3 started"
 "$MODDIR/grant_permissions.sh" &
 
 while true; do
-  LOOP_COUNT=$((LOOP_COUNT + 1))
-  
-  # Periodic log to prove the service is working
-  [ $((LOOP_COUNT % 100)) -eq 0 ] && log "Service alive, loop #$LOOP_COUNT"
-  
-  # Re-grant permissions periodically (every ~30 minutes = 600 loops)
-  if [ $((LOOP_COUNT % 600)) -eq 0 ]; then
-    "$MODDIR/grant_permissions.sh" &
-  fi
-  
-  WIRED=0
-  WIRELESS=0
-
-  # Check with error handling
-  if usb_connected && aa_process_active; then
-    WIRED=1
-    vlog "Detected WIRED mode"
-  elif bt_connected_to_audi && aa_process_active; then
-    WIRELESS=1
-    vlog "Detected WIRELESS mode"
-  fi
-
-  NEWSTATE="IDLE"
-  if [ "$WIRED" = "1" ]; then
-    NEWSTATE="WIRED"
-  elif [ "$WIRELESS" = "1" ]; then
-    NEWSTATE="WIRELESS"
-  fi
-
-  if [ "$NEWSTATE" != "$STATE" ]; then
-    log "State change: $STATE -> $NEWSTATE"
-    case "$NEWSTATE" in
-      WIRED) 
-        apply_wired_profile
-        log "Applied WIRED profile"
-        ;;
-      WIRELESS) 
-        apply_wireless_profile
-        log "Applied WIRELESS profile"
-        ;;
-      IDLE) 
-        apply_idle_profile
-        log "Applied IDLE profile"
-        ;;
-    esac
-    STATE="$NEWSTATE"
-    # Save state
-    echo "{\"state\":\"$STATE\",\"timestamp\":\"$(date)\"}" > "$STATEFILE" 2>/dev/null
-  fi
-
-  sleep 3
+    LOOP_COUNT=$((LOOP_COUNT + 1))
+    
+    # Periodic log to prove the service is working
+    [ $((LOOP_COUNT % 100)) -eq 0 ] && log "Service alive, loop #$LOOP_COUNT"
+    
+    # Re-grant permissions periodically (every ~30 minutes = 600 loops)
+    if [ $((LOOP_COUNT % 600)) -eq 0 ]; then
+        "$MODDIR/grant_permissions.sh" &
+    fi
+    
+    WIRED=0
+    WIRELESS=0
+    
+    # Check with error handling
+    if usb_connected && aa_process_active; then
+        WIRED=1
+        vlog "Detected WIRED mode"
+        elif bt_connected_to_audi && aa_process_active; then
+        WIRELESS=1
+        vlog "Detected WIRELESS mode"
+    fi
+    
+    NEWSTATE="IDLE"
+    if [ "$WIRED" = "1" ]; then
+        NEWSTATE="WIRED"
+        elif [ "$WIRELESS" = "1" ]; then
+        NEWSTATE="WIRELESS"
+    fi
+    
+    if [ "$NEWSTATE" != "$STATE" ]; then
+        log "State change: $STATE -> $NEWSTATE"
+        case "$NEWSTATE" in
+            WIRED)
+                apply_wired_profile
+                log "Applied WIRED profile"
+            ;;
+            WIRELESS)
+                apply_wireless_profile
+                log "Applied WIRELESS profile"
+            ;;
+            IDLE)
+                apply_idle_profile
+                log "Applied IDLE profile"
+            ;;
+        esac
+        STATE="$NEWSTATE"
+        # Save state
+        echo "{\"state\":\"$STATE\",\"timestamp\":\"$(date)\"}" > "$STATEFILE" 2>/dev/null
+    fi
+    
+    sleep 3
 done
