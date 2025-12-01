@@ -444,12 +444,12 @@ apply_wireless_profile(){
 
 apply_idle_profile(){
     if [ "$KEEP_WIFI_IN_IDLE" = "1" ]; then wifi_on; else wifi_off; fi
-    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
+    if [ "$DATA_OFF_OUTSIDE" = "1" ]; then
+      data_off
+    else
       data_on
       sleep 2  # Give data time to connect
       check_data_connection
-    else 
-      data_off
     fi
     battery_saver_on
     set_cpu_max "$IDLE_MAX_CPU_FREQ"
