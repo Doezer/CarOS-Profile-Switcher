@@ -1,35 +1,50 @@
 #!/system/bin/sh
 MODDIR=${0%/*}
-LOGFILE=/data/adb/modules/caros-switcher/log.txt
-CONFFILE=/sdcard/CarOS/config.env
-STATEFILE=/data/adb/modules/caros-switcher/state.json
+# State lives outside the module folder so it survives module updates
+DATADIR=/data/adb/caros
+LOGFILE=$DATADIR/log.txt
+CONFFILE=$DATADIR/config.env
+# Optional user override, easy to edit from Android (only whitelisted keys are read)
+USERCONF=/sdcard/CarOS/config.env
+STATEFILE=$DATADIR/state.json
+mkdir -p "$DATADIR" 2>/dev/null
 
-# Source the centralized configuration
+# Source the centralized configuration (defaults + safe config loader)
 . "$MODDIR/caros_config.sh"
 
 # Rotate logs if > 1MB
-if [ -f "$LOGFILE" ] && [ "$(stat -c%s "$LOGFILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
-    mv "$LOGFILE" "${LOGFILE}.old" 2>/dev/null
-fi
+rotate_log(){
+    if [ -f "$LOGFILE" ] && [ "$(stat -c%s "$LOGFILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+        mv "$LOGFILE" "${LOGFILE}.old" 2>/dev/null
+    fi
+}
+rotate_log
 
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $@" >> "$LOGFILE"; }
-error_log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $@" >> "$LOGFILE"; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOGFILE"; }
+error_log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $*" >> "$LOGFILE"; }
+
+# Wait for the system to be fully booted: pm/cmd/settings/svc are not usable before
+while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done
 
 # Create configuration if it doesn't exist
 if [ ! -f "$CONFFILE" ]; then
-    mkdir -p "$(dirname "$CONFFILE")"
     log "Creating config file: $CONFFILE"
     generate_user_config > "$CONFFILE"
-    chmod 644 "$CONFFILE"
-    log "Config file created successfully"
+    chmod 600 "$CONFFILE"
 fi
 
-[ -f "$CONFFILE" ] && . "$CONFFILE"
+read_config(){
+    load_config "$CONFFILE"
+    load_config "$USERCONF"
+    apply_defaults
+}
 
-# Apply default values
-apply_defaults
+# /sdcard may be mounted slightly after boot_completed (FUSE / file-based encryption)
+n=0
+while [ ! -d /sdcard/Android ] && [ "$n" -lt 30 ]; do sleep 2; n=$((n+1)); done
+read_config
 
-vlog(){ [ "$VERBOSE" = "1" ] && log "[DBG]" "$@"; }
+vlog(){ [ "$VERBOSE" = "1" ] && log "[DBG]" "$@"; return 0; }
 
 wifi_on(){
     cmd wifi set-wifi-enabled enabled >/dev/null 2>&1 || svc wifi enable >/dev/null 2>&1 || error_log "Failed to enable WiFi"
@@ -96,37 +111,53 @@ bt_off(){
     svc bluetooth disable >/dev/null 2>&1 || cmd bluetooth_manager disable >/dev/null 2>&1 || error_log "Failed to disable Bluetooth"
 }
 
-battery_saver_on(){ settings put global low_power 1 || error_log "Failed to enable battery saver"; }
-battery_saver_off(){ settings put global low_power 0 || error_log "Failed to disable battery saver"; }
+battery_saver_on(){ cmd power set-mode 1 >/dev/null 2>&1 || settings put global low_power 1 >/dev/null 2>&1 || error_log "Failed to enable battery saver"; }
+battery_saver_off(){ cmd power set-mode 0 >/dev/null 2>&1 || settings put global low_power 0 >/dev/null 2>&1 || error_log "Failed to disable battery saver"; }
 
+# Cluster-aware: each cpufreq policy (little/big cores) has its own frequency table
+# (the cpuN/cpufreq entries are symlinks to these policy directories, so the glob
+# below visits every policy at least once; writing twice is harmless).
 set_cpu_max(){
     MAX="$1"
-    if [ -n "$MAX" ]; then
-        SUCCESS=0
-        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-            if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
-                echo "$MAX" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
-            fi
-        done
-        [ "$SUCCESS" = "0" ] && error_log "Failed to set CPU max frequency to $MAX"
-    fi
+    [ -n "$MAX" ] || return 0
+    SUCCESS=0
+    for pol in /sys/devices/system/cpu/cpufreq/policy* /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        [ -w "$pol/scaling_max_freq" ] || continue
+        target="$MAX"
+        read -r cmax < "$pol/cpuinfo_max_freq" 2>/dev/null
+        [ -n "$cmax" ] && [ "$target" -gt "$cmax" ] && target="$cmax"
+        # Highest supported frequency not above the target
+        if [ -r "$pol/scaling_available_frequencies" ]; then
+            read -r freqs < "$pol/scaling_available_frequencies"
+            best=""
+            for f in $freqs; do
+                if [ "$f" -le "$target" ] && { [ -z "$best" ] || [ "$f" -gt "$best" ]; }; then best="$f"; fi
+            done
+            [ -n "$best" ] && target="$best"
+        fi
+        echo "$target" > "$pol/scaling_max_freq" 2>/dev/null && SUCCESS=1
+    done
+    [ "$SUCCESS" = "0" ] && error_log "Failed to set CPU max frequency to $MAX"
+    return 0
 }
 reset_cpu_max(){
     SUCCESS=0
-    for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-        if [ -e "$cpu/cpufreq/scaling_max_freq" ] && [ -e "$cpu/cpufreq/cpuinfo_max_freq" ] && [ -w "$cpu/cpufreq/scaling_max_freq" ]; then
-            cat "$cpu/cpufreq/cpuinfo_max_freq" > "$cpu/cpufreq/scaling_max_freq" 2>/dev/null && SUCCESS=1
-        fi
+    for pol in /sys/devices/system/cpu/cpufreq/policy* /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        [ -w "$pol/scaling_max_freq" ] && [ -r "$pol/cpuinfo_max_freq" ] || continue
+        read -r cmax < "$pol/cpuinfo_max_freq"
+        echo "$cmax" > "$pol/scaling_max_freq" 2>/dev/null && SUCCESS=1
     done
-    [ "$SUCCESS" = "0" ] && error_log "Failed to reset CPU max frequency"
+    [ "$SUCCESS" = "0" ] && vlog "No writable CPU frequency control found"
+    return 0
 }
 
-screen_off(){ input keyevent 26 >/dev/null 2>&1; }
+# KEYCODE_SLEEP (223) never wakes the screen, unlike the POWER toggle (26)
+screen_off(){ input keyevent 223 >/dev/null 2>&1; }
 screen_on(){ input keyevent 224 >/dev/null 2>&1 || input keyevent 82 >/dev/null 2>&1; }
 
 # Limit charging current only (never suspend/disable charging: the phone must
 # keep charging in the car). Original values are saved to restore them later.
-CHARGE_SAVE_DIR=/data/adb/modules/caros-switcher/charge_orig
+CHARGE_SAVE_DIR=$DATADIR/charge_orig
 CHARGE_NODES="/sys/class/power_supply/usb/input_current_limit /sys/class/power_supply/battery/constant_charge_current_max"
 
 charge_limit_on(){
@@ -168,122 +199,78 @@ charge_limit_off(){
 
 set_nova_default(){
     [ "$SET_NOVA_DEFAULT" = "1" ] || return 0
-    
-    # Vérifier si Nova Launcher est installé
-    if ! pm list packages | grep -q "com.teslacoilsw.launcher"; then
+    NOVA=com.teslacoilsw.launcher
+
+    if ! pm list packages 2>/dev/null | grep -q "^package:$NOVA$"; then
         vlog "Nova Launcher not installed, skipping default launcher setup"
         return 1
     fi
-    
-    # Définir Nova Launcher comme launcher par défaut
-    if cmd package set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
-        vlog "Nova Launcher set as default launcher"
-        return 0
-        elif pm set-home-activity com.teslacoilsw.launcher/com.android.launcher3.Launcher >/dev/null 2>&1; then
-        vlog "Nova Launcher set as default launcher (fallback method)"
-        return 0
-    else
-        # Méthode alternative avec settings
-        settings put secure default_input_method com.teslacoilsw.launcher >/dev/null 2>&1
-        vlog "Nova Launcher setup attempted via settings"
+
+    # Android 10+: the HOME role is the supported way
+    if cmd role add-role-holder --user 0 android.app.role.HOME "$NOVA" >/dev/null 2>&1; then
+        vlog "Nova Launcher set as HOME role holder"
         return 0
     fi
+
+    # Older: resolve the real HOME activity of the package instead of guessing its class
+    ACT="$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME -p "$NOVA" 2>/dev/null | tail -n 1)"
+    case "$ACT" in
+        "$NOVA"/*)
+            if cmd package set-home-activity "$ACT" >/dev/null 2>&1 || pm set-home-activity "$ACT" >/dev/null 2>&1; then
+                vlog "Nova Launcher set as default launcher ($ACT)"
+                return 0
+            fi
+            ;;
+    esac
+    error_log "Could not set Nova Launcher as default launcher"
+    return 1
 }
 
-# Enable Bluetooth audio sink mode (A2DP sink)
+# Bluetooth audio sink (EXPERIMENTAL): there is no shell command to switch the
+# Bluetooth stack into A2DP sink mode. This only makes the phone discoverable; it
+# works only on ROMs that already ship an A2DP sink profile.
 enable_bt_audio_sink(){
     [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
-    
-    vlog "Enabling Bluetooth audio sink mode"
-    
-    # Ensure Bluetooth is on
     bt_on
     sleep 1
-    
-    # Make device discoverable for pairing
-    # Timeout 0 means stay discoverable indefinitely while in car
-    settings put global bluetooth_discoverable_timeout 0 2>/dev/null
-    
-    # Enable Bluetooth discoverability via dumpsys
-    cmd bluetooth_manager enable 2>/dev/null
-    cmd bluetooth_manager set-discoverability on 2>/dev/null || {
-        # Fallback method
-        settings put global bluetooth_on 1 2>/dev/null
-    }
-    
-    # Try to enable A2DP sink mode via system properties
-    setprop persist.bluetooth.a2dp_sink.enabled true 2>/dev/null
-    setprop bluetooth.a2dp.sink.enabled true 2>/dev/null
-    
-    # Try to set Bluetooth class to audio sink
-    setprop bluetooth.device.class 0x240404 2>/dev/null
-    
-    # Enable audio routing to main speaker for Bluetooth audio
-    # This ensures incoming Bluetooth audio plays through system audio
-    settings put system bluetooth_audio_output 0 2>/dev/null
-    
-    vlog "Bluetooth audio sink mode enabled - device should be discoverable"
-    log "BT Audio Sink: Device is now discoverable for audio streaming"
+    # 0 = stay discoverable while in the car
+    settings put global bluetooth_discoverable_timeout 0 >/dev/null 2>&1
+    log "BT Audio Sink (experimental): discoverable timeout disabled, requires ROM A2DP sink support"
 }
 
-# Disable Bluetooth audio sink mode
 disable_bt_audio_sink(){
     [ "$ENABLE_BT_AUDIO_SINK" = "1" ] || return 0
-    
-    vlog "Disabling Bluetooth audio sink mode"
-    
-    # Disable discoverability to save battery when not in car
-    settings put global bluetooth_discoverable_timeout 120 2>/dev/null
-    cmd bluetooth_manager set-discoverability off 2>/dev/null
-    
-    # Disable A2DP sink mode
-    setprop persist.bluetooth.a2dp_sink.enabled false 2>/dev/null
-    setprop bluetooth.a2dp.sink.enabled false 2>/dev/null
-    
-    # Reset Bluetooth class to default (phone)
-    setprop bluetooth.device.class 0x5A020C 2>/dev/null
-    
+    settings put global bluetooth_discoverable_timeout 120 >/dev/null 2>&1
     vlog "Bluetooth audio sink mode disabled"
 }
 
 # Enable WiFi hotspot for audio streaming
 enable_wifi_audio_hotspot(){
     [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
-    
+
+    if [ "${#WIFI_AUDIO_HOTSPOT_PASSWORD}" -lt 8 ]; then
+        error_log "WiFi hotspot password must be at least 8 characters, hotspot not started"
+        return 1
+    fi
+
     vlog "Enabling WiFi hotspot for audio streaming"
-    
-    # Ensure WiFi is on
     wifi_on
     sleep 1
-    
-    # Stop any existing hotspot
-    cmd wifi stop-softap 2>/dev/null
+    cmd wifi stop-softap >/dev/null 2>&1
     sleep 1
-    
-    # Start WiFi hotspot with configured SSID and password
-    # Method 1: Using cmd wifi (Android 11+)
-    cmd wifi start-softap "$WIFI_AUDIO_HOTSPOT_SSID" wpa2-psk "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null || {
-        # Method 2: Using settings (fallback)
-        settings put global wifi_ap_ssid "$WIFI_AUDIO_HOTSPOT_SSID" 2>/dev/null
-        settings put global wifi_ap_passwd "$WIFI_AUDIO_HOTSPOT_PASSWORD" 2>/dev/null
-        svc wifi enable 2>/dev/null
-    }
-    
-    vlog "WiFi hotspot enabled - SSID: $WIFI_AUDIO_HOTSPOT_SSID"
-    log "WiFi Audio Hotspot: Enabled for audio streaming (SSID: $WIFI_AUDIO_HOTSPOT_SSID)"
+
+    # Android 11+: cmd wifi start-softap <ssid> <open|wpa2|wpa3|...> <passphrase>
+    if cmd wifi start-softap "$WIFI_AUDIO_HOTSPOT_SSID" wpa2 "$WIFI_AUDIO_HOTSPOT_PASSWORD" >/dev/null 2>&1; then
+        log "WiFi Audio Hotspot: enabled (SSID: $WIFI_AUDIO_HOTSPOT_SSID)"
+    else
+        error_log "WiFi hotspot could not be started (cmd wifi start-softap failed)"
+        return 1
+    fi
 }
 
-# Disable WiFi hotspot for audio streaming
 disable_wifi_audio_hotspot(){
     [ "$ENABLE_WIFI_AUDIO_HOTSPOT" = "1" ] || return 0
-    
-    vlog "Disabling WiFi hotspot for audio streaming"
-    
-    # Stop WiFi hotspot
-    cmd wifi stop-softap 2>/dev/null || {
-        settings put global wifi_ap_ssid "" 2>/dev/null
-    }
-    
+    cmd wifi stop-softap >/dev/null 2>&1
     vlog "WiFi hotspot disabled"
 }
 
@@ -303,18 +290,14 @@ aa_process_active(){
     if [ -n "$AA_CACHE" ] && [ $(($(date +%s) - AA_CACHE_TIME)) -lt 2 ]; then
         [ "$AA_CACHE" = "1" ] && return 0 || return 1
     fi
-    
+
     AA_CACHE_TIME=$(date +%s)
+    # Only the process counts: "dumpsys activity services" also matches idle background services
     if pidof com.google.android.projection.gearhead >/dev/null 2>&1; then
         AA_CACHE=1
         return 0
     fi
-    
-    if dumpsys activity services 2>/dev/null | grep -qi com.google.android.projection.gearhead; then
-        AA_CACHE=1
-        return 0
-    fi
-    
+
     AA_CACHE=0
     return 1
 }
@@ -351,44 +334,84 @@ bt_connected_to_audi(){
     return 1
 }
 
-apply_wired_profile(){
-    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
+apply_data(){
+    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then
       data_on
       sleep 2  # Give data time to connect
       check_data_connection
-    else 
+    else
       data_off
-    fi    
+    fi
+}
+
+# --- Carbox / parking mode helpers (best effort) ---------------------------------
+parking_on(){
+    [ "$PARKING_MODE" = "1" ] || return 0
+    settings put global wifi_scan_always_enabled 0 >/dev/null 2>&1
+    settings put global ble_scan_always_enabled 0 >/dev/null 2>&1
+    cmd location set-location-enabled false >/dev/null 2>&1 || settings put secure location_mode 0 >/dev/null 2>&1
+    # Force Doze (only effective while the screen is off and the phone is not charging)
+    cmd deviceidle force-idle >/dev/null 2>&1
+    vlog "Parking mode on"
+}
+parking_off(){
+    [ "$PARKING_MODE" = "1" ] || return 0
+    cmd deviceidle unforce >/dev/null 2>&1
+    cmd location set-location-enabled true >/dev/null 2>&1 || settings put secure location_mode 3 >/dev/null 2>&1
+    vlog "Parking mode off"
+}
+
+# Shut the phone down when idle, unplugged and low, to protect an unattended battery
+check_auto_shutdown(){
+    [ "$AUTO_SHUTDOWN_PCT" -gt 0 ] || return 0
+    BAT=/sys/class/power_supply/battery
+    [ -r "$BAT/capacity" ] || return 0
+    read -r LEVEL < "$BAT/capacity"
+    read -r CHG < "$BAT/status"
+    case "$CHG" in
+        Charging|Full) return 0 ;;
+    esac
+    case "$LEVEL" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$LEVEL" -lt "$AUTO_SHUTDOWN_PCT" ]; then
+        log "Battery at ${LEVEL}% (< ${AUTO_SHUTDOWN_PCT}%) and not charging: shutting down"
+        reboot -p >/dev/null 2>&1 || svc power shutdown >/dev/null 2>&1
+    fi
+}
+
+disable_lockscreen(){
+    [ "$DISABLE_LOCKSCREEN" = "1" ] || return 0
+    if locksettings set-disabled true >/dev/null 2>&1; then
+        log "Lock screen disabled"
+    else
+        error_log "Could not disable the lock screen (a PIN/pattern/password is probably set)"
+    fi
+}
+
+# --- Profiles ---------------------------------------------------------------------
+apply_wired_profile(){
+    apply_data
     if [ "$ALLOW_BT_IN_WIRED" = "1" ]; then bt_on; else bt_off; fi
     if [ "$KEEP_WIFI_IN_WIRED" = "1" ]; then wifi_on; else wifi_off; fi
     battery_saver_off
+    parking_off
     reset_cpu_max
-    [ "$LIMIT_QUICK_CHARGE_WIRED" = "1" ] && charge_limit_on
+    if [ "$LIMIT_QUICK_CHARGE_WIRED" = "1" ]; then charge_limit_on; else charge_limit_off; fi
     set_nova_default
     # Enable audio streaming (Bluetooth or WiFi hotspot based on config)
     enable_bt_audio_sink
     enable_wifi_audio_hotspot
-    screen_off
 }
 
 apply_wireless_profile(){
     bt_on
     wifi_on
-    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
-      data_on
-      sleep 2  # Give data time to connect
-      check_data_connection
-    else 
-      data_off
-    fi
+    apply_data
     battery_saver_off
+    parking_off
     reset_cpu_max
     charge_limit_off
     set_nova_default
-    # Note: BT audio sink NOT enabled in wireless mode because Bluetooth is already
-    # being used to connect to the car. WiFi may also be used by wireless AA.
-    # Audio streaming features disabled in wireless mode.
-    screen_off
+    # BT audio sink is not enabled in wireless mode: Bluetooth (and WiFi) are used by the car link.
 }
 
 apply_idle_profile(){
@@ -405,6 +428,15 @@ apply_idle_profile(){
     charge_limit_off
     disable_bt_audio_sink
     disable_wifi_audio_hotspot
+    parking_on
+}
+
+apply_profile(){
+    case "$1" in
+        WIRED)    apply_wired_profile ;;
+        WIRELESS) apply_wireless_profile ;;
+        IDLE)     apply_idle_profile ;;
+    esac
 }
 
 STATE=""
@@ -413,61 +445,72 @@ AA_CACHE=""
 AA_CACHE_TIME=0
 BT_CACHE=""
 BT_CACHE_TIME=0
-log "CarOS Profile Switcher service v0.2.3 started"
+LAST_APPLY=0
+LAST_SHUTDOWN_CHECK=0
+REAPPLY_EVERY=300   # seconds: re-apply the current profile in case something changed radios behind our back
+log "CarOS Profile Switcher service v0.2.4 started"
 
-# Grant permissions on service start (async)
+if [ "$ENABLE_WIRELESS_PROFILE" = "1" ] && [ "$KEEP_WIFI_IN_IDLE" != "1" ]; then
+    log "[WARN] Wireless Android Auto needs WiFi before the phone connects: set KEEP_WIFI_IN_IDLE=1, or ENABLE_WIRELESS_PROFILE=0 for a wired-only setup"
+fi
+
+disable_lockscreen
+
+# Grant permissions once per boot (async)
 "$MODDIR/grant_permissions.sh" &
 
 while true; do
     LOOP_COUNT=$((LOOP_COUNT + 1))
-    
-    # Periodic log to prove the service is working
-    [ $((LOOP_COUNT % 100)) -eq 0 ] && log "Service alive, loop #$LOOP_COUNT"
-    
-    # Re-grant permissions periodically (every ~30 minutes = 600 loops)
-    if [ $((LOOP_COUNT % 600)) -eq 0 ]; then
-        "$MODDIR/grant_permissions.sh" &
+    NOW=$(date +%s)
+
+    # Periodic log to prove the service is working; also re-read the config so edits apply live
+    if [ $((LOOP_COUNT % 100)) -eq 0 ]; then
+        log "Service alive, loop #$LOOP_COUNT, state $STATE"
+        rotate_log
+        read_config
     fi
-    
+
     WIRED=0
     WIRELESS=0
-    
-    # Check with error handling
+
     if usb_connected && aa_process_active; then
         WIRED=1
         vlog "Detected WIRED mode"
-        elif bt_connected_to_audi && aa_process_active; then
+    elif [ "$ENABLE_WIRELESS_PROFILE" = "1" ] && bt_connected_to_audi && aa_process_active; then
         WIRELESS=1
         vlog "Detected WIRELESS mode"
     fi
-    
+
     NEWSTATE="IDLE"
     if [ "$WIRED" = "1" ]; then
         NEWSTATE="WIRED"
-        elif [ "$WIRELESS" = "1" ]; then
+    elif [ "$WIRELESS" = "1" ]; then
         NEWSTATE="WIRELESS"
     fi
-    
+
     if [ "$NEWSTATE" != "$STATE" ]; then
         log "State change: $STATE -> $NEWSTATE"
-        case "$NEWSTATE" in
-            WIRED)
-                apply_wired_profile
-                log "Applied WIRED profile"
-            ;;
-            WIRELESS)
-                apply_wireless_profile
-                log "Applied WIRELESS profile"
-            ;;
-            IDLE)
-                apply_idle_profile
-                log "Applied IDLE profile"
-            ;;
-        esac
+        apply_profile "$NEWSTATE"
+        # Screen off only on a real transition (not on the periodic re-apply)
+        [ "$NEWSTATE" = "IDLE" ] || screen_off
+        log "Applied $NEWSTATE profile"
         STATE="$NEWSTATE"
-        # Save state
+        LAST_APPLY=$(date +%s)
         echo "{\"state\":\"$STATE\",\"timestamp\":\"$(date)\"}" > "$STATEFILE" 2>/dev/null
+    elif [ $((NOW - LAST_APPLY)) -ge "$REAPPLY_EVERY" ]; then
+        vlog "Re-applying $STATE profile"
+        apply_profile "$STATE"
+        LAST_APPLY=$(date +%s)
     fi
-    
-    sleep 3
+
+    if [ "$STATE" = "IDLE" ]; then
+        # Poll less often (and run fewer dumpsys) while the car is off
+        if [ $((NOW - LAST_SHUTDOWN_CHECK)) -ge 60 ]; then
+            check_auto_shutdown
+            LAST_SHUTDOWN_CHECK=$NOW
+        fi
+        sleep 10
+    else
+        sleep 3
+    fi
 done

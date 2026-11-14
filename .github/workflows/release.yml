@@ -56,7 +56,7 @@ jobs:
           2. Magisk → Modules → Installer depuis le stockage
           3. Choisir le ZIP puis redémarrer
 
-          Configuration : \`/sdcard/CarOS/config.env\` (voir [EXAMPLES.md](https://github.com/${REPO}/blob/main/EXAMPLES.md)).
+          Configuration : \`/data/adb/caros/config.env\` (voir [EXAMPLES.md](https://github.com/${REPO}/blob/main/EXAMPLES.md)).
 
           **Prérequis** : Magisk v20.4+, Android Auto, accès root.
           EOT

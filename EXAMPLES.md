@@ -238,7 +238,7 @@ VERBOSE=1                      # Full logging
 ### Method 2: Check Logs
 1. Enable verbose logging: `VERBOSE=1`
 2. Connect to your car
-3. View logs: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+3. View logs: `adb shell cat /data/adb/caros/log.txt`
 4. Look for lines mentioning Bluetooth device names
 
 ### Method 3: Dumpsys (Advanced)
@@ -286,10 +286,10 @@ AUDI_BT_NAMES="Car \\(2024\\)"
 ```
 
 ### Testing Your Configuration
-After editing `/sdcard/CarOS/config.env`:
+After editing `/data/adb/caros/config.env`:
 1. Don't need to reboot (config reloads automatically)
 2. Connect to your car
-3. Check logs: `adb shell tail -f /data/adb/modules/caros-switcher/log.txt`
+3. Check logs: `adb shell tail -f /data/adb/caros/log.txt`
 4. Should see "State change: IDLE -> WIRELESS" or "-> WIRED"
 
 ### Common Pitfalls

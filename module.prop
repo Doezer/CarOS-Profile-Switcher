@@ -1,6 +1,6 @@
 id=caros-switcher
 name=CarOS Profile Switcher (Wired & Wireless AA)
-version=0.2.3
-versionCode=4
+version=0.2.4
+versionCode=5
 author=Vincent+ChatGPT
-description=Auto WIRED/WIRELESS switching + Smart WiFi + Nova default + fast charge limit. Config: /sdcard/CarOS/config.env. v0.2.3: Smart WiFi + VW Polo 6 compatible + Auto permissions
+description=Auto WIRED/WIRELESS switching + Smart WiFi + Nova default + charge limit + carbox parking mode. Config: /data/adb/caros/config.env. v0.2.4: reliable detection, safe charge limit, safer config
