@@ -1,97 +1,71 @@
-name: Build and Release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v0.2.4
-  workflow_dispatch:  # Allows manual trigger
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publier la release
+    needs: ci
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Extract version from tag
-      id: get_version
-      run: |
-        if [ "${{ github.ref_type }}" == "tag" ]; then
-          VERSION=${GITHUB_REF#refs/tags/v}
-        else
-          VERSION=$(grep "^version=" module.prop | cut -d'=' -f2)
-        fi
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "Building version: $VERSION"
-        
-    - name: Validate required files
-      run: |
-        echo "Checking required files..."
-        for file in caros_config.sh module.prop post-fs-data.sh service.sh system.prop grant_permissions.sh META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script; do
-          if [ ! -f "$file" ]; then
-            echo "Error: Missing required file: $file"
+      - uses: actions/checkout@v4
+
+      - name: Le tag correspond à module.prop
+        id: ver
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PROP_VERSION=$(sed -n 's/^version=//p' module.prop | tr -d '\r')
+          if [ "$TAG_VERSION" != "$PROP_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME != version=$PROP_VERSION dans module.prop"
             exit 1
           fi
-        done
-        echo "All required files present ✓"
-        
-    - name: Create release directory
-      run: mkdir -p rel
-      
-    - name: Build release ZIP
-      run: |
-        VERSION=${{ steps.get_version.outputs.VERSION }}
-        OUTPUT_FILE="rel/CarOS_Profile_Switcher-v${VERSION}.zip"
-        
-        zip -r "$OUTPUT_FILE" \
-          caros_config.sh \
-          module.prop \
-          post-fs-data.sh \
-          service.sh \
-          system.prop \
-          grant_permissions.sh \
-          META-INF
-        
-        echo "Created: $OUTPUT_FILE"
-        ls -lh "$OUTPUT_FILE"
-        
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        files: rel/*.zip
-        body: |
-          ## CarOS Profile Switcher v${{ steps.get_version.outputs.VERSION }}
-          
+          echo "version=$PROP_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build (build.sh)
+        run: bash build.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Notes de release (extraites de CHANGELOG.md)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "## CarOS Profile Switcher v${VERSION}"
+            echo
+            awk -v v="$VERSION" '
+              $0 ~ "^## \\[" v "\\]" { on=1; next }
+              on && /^## \[/ { exit }
+              on { print }
+            ' CHANGELOG.md
+            cat <<EOT
+
           ### Installation
-          1. Download the ZIP file below
-          2. Open Magisk Manager
-          3. Go to Modules → Install from storage
-          4. Select the downloaded ZIP
-          5. Reboot
-          
-          ### Configuration
-          Edit `/sdcard/CarOS/config.env` after installation.
-          
-          See [EXAMPLES.md](https://github.com/${{ github.repository }}/blob/main/EXAMPLES.md) for car-specific configurations.
-          
-          ### Changelog
-          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-          
-          ---
-          **Requirements**: Magisk v20.4+, Android Auto, Root access
-        draft: false
-        prerelease: false
-        
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: caros-profile-switcher-v${{ steps.get_version.outputs.VERSION }}
-        path: rel/*.zip
-        retention-days: 90
+          1. Télécharger le ZIP ci-dessous
+          2. Magisk → Modules → Installer depuis le stockage
+          3. Choisir le ZIP puis redémarrer
+
+          Configuration : \`/sdcard/CarOS/config.env\` (voir [EXAMPLES.md](https://github.com/${REPO}/blob/main/EXAMPLES.md)).
+
+          **Prérequis** : Magisk v20.4+, Android Auto, accès root.
+          EOT
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Créer la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rel/*.zip
+          body_path: release-notes.md
+          fail_on_unmatched_files: true

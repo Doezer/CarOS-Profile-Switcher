@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:   # réutilisé par release.yml avant de publier
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Scripts exécutés par Android (/system/bin/sh = mksh)
+  MODULE_SCRIPTS: caros_config.sh post-fs-data.sh service.sh grant_permissions.sh META-INF/com/google/android/update-binary
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck (scripts du module, dialecte ksh/mksh)
+        run: |
+          # shellcheck disable=SC2086  # découpage voulu de la liste
+          shellcheck --shell=ksh --severity=warning $MODULE_SCRIPTS
+      - name: ShellCheck (build.sh, bash)
+        run: shellcheck --shell=bash --severity=warning build.sh
+
+  syntax:
+    name: Syntax (mksh / bash)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mksh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mksh
+      - name: mksh -n (shell d'Android)
+        run: |
+          for f in $MODULE_SCRIPTS; do
+            echo "mksh -n $f"
+            mksh -n "$f"
+          done
+      - name: bash -n build.sh
+        run: bash -n build.sh
+
+  hygiene:
+    name: Fichiers (CRLF, BOM, shebang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pas de CRLF ni de BOM dans les fichiers du module
+        run: |
+          fail=0
+          for f in $MODULE_SCRIPTS module.prop system.prop META-INF/com/google/android/updater-script; do
+            if grep -q $'\r' "$f"; then echo "::error file=$f::fins de ligne CRLF (Android exige LF)"; fail=1; fi
+            if [ "$(head -c3 "$f" | xxd -p)" = "efbbbf" ]; then echo "::error file=$f::BOM UTF-8 présent"; fail=1; fi
+          done
+          exit $fail
+      - name: Shebang présent
+        run: |
+          fail=0
+          for f in $MODULE_SCRIPTS; do
+            case "$(head -n1 "$f")" in
+              '#!'*) ;;
+              *) echo "::error file=$f::shebang manquant"; fail=1 ;;
+            esac
+          done
+          exit $fail
+      - name: updater-script contient #MAGISK
+        run: grep -qx '#MAGISK' META-INF/com/google/android/updater-script
+
+  metadata:
+    name: Métadonnées et versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: module.prop valide
+        run: |
+          fail=0
+          for key in id name version versionCode author description; do
+            grep -q "^${key}=." module.prop || { echo "::error file=module.prop::champ '$key' manquant ou vide"; fail=1; }
+          done
+          grep -Eq '^versionCode=[0-9]+$' module.prop || { echo "::error file=module.prop::versionCode doit être un entier"; fail=1; }
+          grep -Eq '^version=[0-9]+\.[0-9]+\.[0-9]+$' module.prop || { echo "::error file=module.prop::version doit être de la forme X.Y.Z"; fail=1; }
+          exit $fail
+      - name: Cohérence des versions (module.prop, service.sh, caros_config.sh)
+        run: |
+          V=$(sed -n 's/^version=//p' module.prop | tr -d '\r')
+          S=$(sed -n 's/.*CarOS Profile Switcher service v\([0-9][0-9.]*\).*/\1/p' service.sh | head -n1)
+          C=$(sed -n 's/.*Centralized Configuration v\([0-9][0-9.]*\).*/\1/p' caros_config.sh | head -n1)
+          echo "module.prop=$V  service.sh=$S  caros_config.sh=$C"
+          if [ "$V" != "$S" ] || [ "$V" != "$C" ]; then
+            echo "::error::versions incohérentes"; exit 1
+          fi
+      - name: CHANGELOG contient la version courante
+        run: |
+          V=$(sed -n 's/^version=//p' module.prop)
+          grep -q "^## \[$V\]" CHANGELOG.md || { echo "::error file=CHANGELOG.md::pas de section '## [$V]'"; exit 1; }
+
+  actionlint:
+    name: Lint des workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+
+  build:
+    name: Build du ZIP Magisk
+    runs-on: ubuntu-latest
+    needs: [ shellcheck, syntax, hygiene, metadata ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (build.sh)
+        run: bash build.sh
+      - name: Vérifier le contenu du ZIP
+        run: |
+          ZIP=$(ls rel/CarOS_Profile_Switcher-v*.zip)
+          unzip -Z1 "$ZIP" | sort > actual.txt
+          cat > expected.txt <<'LIST'
+          META-INF/
+          META-INF/com/
+          META-INF/com/google/
+          META-INF/com/google/android/
+          META-INF/com/google/android/update-binary
+          META-INF/com/google/android/updater-script
+          caros_config.sh
+          grant_permissions.sh
+          module.prop
+          post-fs-data.sh
+          service.sh
+          system.prop
+          LIST
+          sort -o expected.txt expected.txt
+          diff expected.txt actual.txt && echo "Contenu du ZIP conforme"
+          unzip -tq "$ZIP"
+      - name: Publier le ZIP (artefact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: caros-profile-switcher-${{ github.sha }}
+          path: rel/*.zip
+          retention-days: 14
+          if-no-files-found: error
