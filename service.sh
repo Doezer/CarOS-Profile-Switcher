@@ -32,67 +32,32 @@ apply_defaults
 vlog(){ [ "$VERBOSE" = "1" ] && log "[DBG]" "$@"; }
 
 wifi_on(){
-    cmd wifi set-wifi-enabled enabled 2>/dev/null || svc wifi enable 2>/dev/null || {
-        settings put global wifi_on 1 2>/dev/null || error_log "Failed to enable WiFi"
-    }
+    cmd wifi set-wifi-enabled enabled >/dev/null 2>&1 || svc wifi enable >/dev/null 2>&1 || error_log "Failed to enable WiFi"
 }
 wifi_off(){
-    cmd wifi set-wifi-enabled disabled 2>/dev/null || svc wifi disable 2>/dev/null || {
-        settings put global wifi_on 0 2>/dev/null || error_log "Failed to disable WiFi"
-    }
+    cmd wifi set-wifi-enabled disabled >/dev/null 2>&1 || svc wifi disable >/dev/null 2>&1 || error_log "Failed to disable WiFi"
 }
 
 data_on(){
     log "Enabling mobile data..."
-    
-    # Method 1: Modern Android (11+)
-    cmd telephony data enable 2>/dev/null || {
-        # Method 2: Settings + svc fallback
-        settings put global mobile_data 1 2>/dev/null
-        svc data enable 2>/dev/null
-    }
-    
-    # Ensure mobile radio is on
-    settings put global airplane_mode_on 0 2>/dev/null
-    
-    # Force data connection reestablishment
-    cmd phone data connection-state true 2>/dev/null
-    
-    # Wait briefly for radio to initialize
+    svc data enable >/dev/null 2>&1 || settings put global mobile_data 1 >/dev/null 2>&1
     sleep 1
-    
-    # Trigger data connection through telephony service
-    service call phone 27 i32 1 2>/dev/null || {
-        service call phone 34 i32 1 2>/dev/null
-    }
-    
-    # Verify data is enabled
     DATA_STATE=$(settings get global mobile_data 2>/dev/null)
     if [ "$DATA_STATE" != "1" ]; then
         error_log "Failed to enable mobile data - state: $DATA_STATE"
         return 1
     fi
-    
     vlog "Mobile data enabled successfully"
     return 0
 }
 
 data_off(){
     log "Disabling mobile data..."
-    
-    # Method 1: Modern Android (11+)
-    cmd telephony data disable 2>/dev/null || {
-        # Method 2: Settings + svc fallback
-        settings put global mobile_data 0 2>/dev/null
-        svc data disable 2>/dev/null
-    }
-    
-    # Verify data is disabled
+    svc data disable >/dev/null 2>&1 || settings put global mobile_data 0 >/dev/null 2>&1
     DATA_STATE=$(settings get global mobile_data 2>/dev/null)
     if [ "$DATA_STATE" != "0" ]; then
         error_log "Failed to disable mobile data - state: $DATA_STATE"
     fi
-    
     vlog "Mobile data disabled"
 }
 
@@ -125,14 +90,10 @@ check_data_connection(){
 }
 
 bt_on(){
-    cmd bluetooth enable >/dev/null 2>&1 || settings put global bluetooth_on 1 >/dev/null 2>&1 || {
-        service call bluetooth_manager 6 >/dev/null 2>&1 || error_log "Failed to enable Bluetooth"
-    }
+    svc bluetooth enable >/dev/null 2>&1 || cmd bluetooth_manager enable >/dev/null 2>&1 || error_log "Failed to enable Bluetooth"
 }
 bt_off(){
-    cmd bluetooth disable >/dev/null 2>&1 || settings put global bluetooth_on 0 >/dev/null 2>&1 || {
-        service call bluetooth_manager 8 >/dev/null 2>&1 || error_log "Failed to disable Bluetooth"
-    }
+    svc bluetooth disable >/dev/null 2>&1 || cmd bluetooth_manager disable >/dev/null 2>&1 || error_log "Failed to disable Bluetooth"
 }
 
 battery_saver_on(){ settings put global low_power 1 || error_log "Failed to enable battery saver"; }
@@ -163,52 +124,32 @@ reset_cpu_max(){
 screen_off(){ input keyevent 26 >/dev/null 2>&1; }
 screen_on(){ input keyevent 224 >/dev/null 2>&1 || input keyevent 82 >/dev/null 2>&1; }
 
+# Limit charging current only (never suspend/disable charging: the phone must
+# keep charging in the car). Original values are saved to restore them later.
+CHARGE_SAVE_DIR=/data/adb/modules/caros-switcher/charge_orig
+CHARGE_NODES="/sys/class/power_supply/usb/input_current_limit /sys/class/power_supply/battery/constant_charge_current_max"
+
 charge_limit_on(){
     SUCCESS=0
-    for n in \
-    /sys/class/power_supply/battery/charging_enabled \
-    /sys/class/power_supply/battery/charge_enabled \
-    /sys/class/power_supply/battery/charge_disable \
-    /sys/class/power_supply/battery/input_suspend \
-    /sys/class/power_supply/usb/input_current_limit \
-    /sys/class/power_supply/battery/constant_charge_current_max \
-    ; do
+    mkdir -p "$CHARGE_SAVE_DIR" 2>/dev/null
+    for n in $CHARGE_NODES; do
         if [ -e "$n" ] && [ -w "$n" ]; then
-            case "$n" in
-                */input_current_limit|*/constant_charge_current_max)
-                echo 500000 > "$n" 2>/dev/null && SUCCESS=1 ;;
-                *charging_enabled|*charge_enabled)
-                echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
-                *charge_disable|*input_suspend)
-                echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
-            esac
+            key="$(echo "$n" | tr '/' '_')"
+            # Save the original value only once
+            [ -f "$CHARGE_SAVE_DIR/$key" ] || cat "$n" > "$CHARGE_SAVE_DIR/$key" 2>/dev/null
+            echo 1000000 > "$n" 2>/dev/null && SUCCESS=1
         fi
     done
-    [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
+    [ "$SUCCESS" = "0" ] && vlog "No writable charge current control found"
     return $((1-SUCCESS))
 }
 charge_limit_off(){
-    SUCCESS=0
-    for n in \
-    /sys/class/power_supply/battery/charging_enabled \
-    /sys/class/power_supply/battery/charge_enabled \
-    /sys/class/power_supply/battery/charge_disable \
-    /sys/class/power_supply/battery/input_suspend \
-    /sys/class/power_supply/usb/input_current_limit \
-    /sys/class/power_supply/battery/constant_charge_current_max \
-    ; do
-        if [ -e "$n" ] && [ -w "$n" ]; then
-            case "$n" in
-                */input_current_limit|*/constant_charge_current_max)
-                echo 3000000 > "$n" 2>/dev/null && SUCCESS=1 ;;
-                *charging_enabled|*charge_enabled)
-                echo 1 > "$n" 2>/dev/null && SUCCESS=1 ;;
-                *charge_disable|*input_suspend)
-                echo 0 > "$n" 2>/dev/null && SUCCESS=1 ;;
-            esac
+    for n in $CHARGE_NODES; do
+        key="$(echo "$n" | tr '/' '_')"
+        if [ -f "$CHARGE_SAVE_DIR/$key" ] && [ -w "$n" ]; then
+            cat "$CHARGE_SAVE_DIR/$key" > "$n" 2>/dev/null && rm -f "$CHARGE_SAVE_DIR/$key"
         fi
     done
-    [ "$SUCCESS" = "0" ] && vlog "No writable charge control found"
     return 0
 }
 
@@ -334,10 +275,13 @@ disable_wifi_audio_hotspot(){
 }
 
 usb_connected(){
-    if [ -f /sys/class/power_supply/usb/online ] && [ "$(cat /sys/class/power_supply/usb/online 2>/dev/null)" = "1" ]; then
-        return 0
-    fi
-    dumpsys usb 2>/dev/null | grep -q "mConnected=true" && return 0
+    # Wired Android Auto puts the phone in USB accessory mode
+    case "$(getprop sys.usb.state 2>/dev/null)" in
+        *accessory*) return 0 ;;
+    esac
+    case "$(getprop sys.usb.config 2>/dev/null)" in
+        *accessory*) return 0 ;;
+    esac
     return 1
 }
 
@@ -373,31 +317,23 @@ bt_connected_to_audi(){
     # Escape special characters in AUDI_BT_NAMES
     ESCAPED_NAMES="$(echo "$AUDI_BT_NAMES" | sed 's/[].[^$\\/*]/\\&/g')"
     
-    # Quick attempt with dumpsys
-    if DUMP="$(dumpsys bluetooth_manager 2>/dev/null | head -100)"; then
-        # Check by MAC if specified
-        if [ -n "$AUDI_BT_MAC" ]; then
-            if echo "$DUMP" | grep -i "$AUDI_BT_MAC" | grep -qi "Connected.*true\|State.*Connected"; then
-                BT_CACHE=1
-                return 0
-            fi
-        fi
-        
-        # Check by name
-        if echo "$DUMP" | grep -Eiq "Name:.*($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected.*true\|State.*Connected"; then
-            BT_CACHE=1
-            return 0
-        fi
-        
-        # Fallback: broader search
-        if echo "$DUMP" | grep -Eiq "($ESCAPED_NAMES)" && echo "$DUMP" | grep -qi "Connected"; then
-            BT_CACHE=1
-            return 0
-        fi
-    else
+    DUMP="$(dumpsys bluetooth_manager 2>/dev/null)"
+    if [ -z "$DUMP" ]; then
         vlog "Bluetooth dumpsys failed, assuming disconnected"
+    else
+        # "connected" as a word, not "disconnected" / "STATE_DISCONNECTED"
+        CONN_RE='(^|[^A-Za-z])connected'
+        # Look for a connected state close to the car's MAC or name
+        if [ -n "$AUDI_BT_MAC" ] && echo "$DUMP" | grep -i -A15 "$AUDI_BT_MAC" | grep -Eiq "$CONN_RE"; then
+            BT_CACHE=1
+            return 0
+        fi
+        if [ -n "$AUDI_BT_NAMES" ] && echo "$DUMP" | grep -Ei -A15 "($ESCAPED_NAMES)" | grep -Eiq "$CONN_RE"; then
+            BT_CACHE=1
+            return 0
+        fi
     fi
-    
+
     BT_CACHE=0
     return 1
 }
@@ -444,13 +380,13 @@ apply_wireless_profile(){
 
 apply_idle_profile(){
     if [ "$KEEP_WIFI_IN_IDLE" = "1" ]; then wifi_on; else wifi_off; fi
-    if [ "$KEEP_DATA_IN_CAR" = "1" ]; then 
-      data_on
-      sleep 2  # Give data time to connect
-      check_data_connection
-    else 
+    if [ "$DATA_OFF_OUTSIDE" = "1" ]; then
       data_off
+    else
+      data_on
     fi
+    # WIRELESS detection needs Bluetooth, so it stays on unless KEEP_BT_IN_IDLE=0
+    [ "$KEEP_BT_IN_IDLE" = "1" ] || bt_off
     battery_saver_on
     set_cpu_max "$IDLE_MAX_CPU_FREQ"
     charge_limit_off
