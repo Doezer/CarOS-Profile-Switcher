@@ -135,8 +135,21 @@ charge_limit_on(){
     for n in $CHARGE_NODES; do
         if [ -e "$n" ] && [ -w "$n" ]; then
             key="$(echo "$n" | tr '/' '_')"
-            # Save the original value only once
-            [ -f "$CHARGE_SAVE_DIR/$key" ] || cat "$n" > "$CHARGE_SAVE_DIR/$key" 2>/dev/null
+            # Save the original value only once, via a temp file so an empty or
+            # partial backup is never published
+            if [ ! -s "$CHARGE_SAVE_DIR/$key" ]; then
+                if cat "$n" > "$CHARGE_SAVE_DIR/$key.tmp" 2>/dev/null && [ -s "$CHARGE_SAVE_DIR/$key.tmp" ]; then
+                    mv "$CHARGE_SAVE_DIR/$key.tmp" "$CHARGE_SAVE_DIR/$key" 2>/dev/null || {
+                        error_log "Could not save charge backup for $n, skipping"
+                        rm -f "$CHARGE_SAVE_DIR/$key.tmp"
+                        continue
+                    }
+                else
+                    error_log "Could not read original charge value of $n, skipping"
+                    rm -f "$CHARGE_SAVE_DIR/$key.tmp"
+                    continue
+                fi
+            fi
             echo 1000000 > "$n" 2>/dev/null && SUCCESS=1
         fi
     done
@@ -146,7 +159,7 @@ charge_limit_on(){
 charge_limit_off(){
     for n in $CHARGE_NODES; do
         key="$(echo "$n" | tr '/' '_')"
-        if [ -f "$CHARGE_SAVE_DIR/$key" ] && [ -w "$n" ]; then
+        if [ -s "$CHARGE_SAVE_DIR/$key" ] && [ -w "$n" ]; then
             cat "$CHARGE_SAVE_DIR/$key" > "$n" 2>/dev/null && rm -f "$CHARGE_SAVE_DIR/$key"
         fi
     done
@@ -386,7 +399,7 @@ apply_idle_profile(){
       data_on
     fi
     # WIRELESS detection needs Bluetooth, so it stays on unless KEEP_BT_IN_IDLE=0
-    [ "$KEEP_BT_IN_IDLE" = "1" ] || bt_off
+    if [ "$KEEP_BT_IN_IDLE" = "1" ]; then bt_on; else bt_off; fi
     battery_saver_on
     set_cpu_max "$IDLE_MAX_CPU_FREQ"
     charge_limit_off
