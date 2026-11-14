@@ -1,0 +1,4 @@
+# SC1090: les fichiers sourcés (config.env) n'existent que sur le téléphone
+# SC2034: variables de l'API Magisk (OUTFD, ZIPFILE...) utilisées par util_functions.sh
+# SC2145: "$@" dans les fonctions de log, comportement voulu
+disable=SC1090,SC2034,SC2145
