@@ -40,10 +40,10 @@ Check these:
 2. Android Auto app is installed
 3. You've paired your car via Bluetooth
 4. Module is enabled in Magisk Manager
-5. Check logs: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+5. Check logs: `adb shell cat /data/adb/caros/log.txt`
 
 ### Where is the configuration file?
-`/sdcard/CarOS/config.env`
+`/data/adb/caros/config.env`
 
 The module creates this automatically on first boot. You can edit it with any text editor.
 
@@ -188,7 +188,7 @@ Check:
 4. Verify process name: `pidof com.google.android.projection.gearhead`
 
 ### Profiles not switching
-1. Check logs: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+1. Check logs: `adb shell cat /data/adb/caros/log.txt`
 2. Verify Bluetooth name matches: `AUDI_BT_NAMES="Your Car Name"`
 3. Try MAC address matching instead
 4. Ensure Android Auto is actually running (not just connected)
@@ -236,9 +236,10 @@ Yes, but changes will be lost on module updates. Better to:
 ### Where are the module files located?
 ```
 /data/adb/modules/caros-switcher/     # Module directory
-/data/adb/modules/caros-switcher/log.txt  # Logs
-/data/adb/modules/caros-switcher/state.json  # Current state
-/sdcard/CarOS/config.env               # User configuration
+/data/adb/caros/                      # Config, logs, state
+/data/adb/caros/log.txt  # Logs
+/data/adb/caros/state.json  # Current state
+/data/adb/caros/config.env               # User configuration
 ```
 
 ### How do I uninstall?
@@ -247,7 +248,7 @@ Yes, but changes will be lost on module updates. Better to:
 3. Tap **Remove** on CarOS Profile Switcher
 4. Reboot
 
-Configuration file at `/sdcard/CarOS/` will remain (delete manually if desired).
+Configuration and logs in `/data/adb/caros/` (and an optional `/sdcard/CarOS/`) will remain (delete manually if desired).
 
 ### Can I pause the module temporarily?
 Yes:
@@ -314,7 +315,7 @@ If issues occur, boot to recovery and disable/remove via Magisk.
 ### How do I report bugs?
 1. Enable `VERBOSE=1` in config
 2. Reproduce the issue
-3. Collect logs: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+3. Collect logs: `adb shell cat /data/adb/caros/log.txt`
 4. Open a GitHub issue with logs and details
 
 ### Can I contribute?
@@ -343,5 +344,5 @@ Shell script (Bash/sh) - standard for Magisk modules.
 
 **Remember:** Always include logs when asking for help!
 ```bash
-adb shell cat /data/adb/modules/caros-switcher/log.txt
+adb shell cat /data/adb/caros/log.txt
 ```

@@ -23,7 +23,7 @@ A Magisk module for Android that automatically switches device profiles based on
 - **🎵 Audio Streaming**: Stream audio from another device to car speakers via Bluetooth A2DP sink or WiFi hotspot
 
 ### Configuration
-- User-configurable via `/sdcard/CarOS/config.env`
+- User-configurable via `/data/adb/caros/config.env`
 - Supports multiple car Bluetooth names (regex patterns)
 - MAC address matching support
 - Verbose logging for troubleshooting
@@ -46,7 +46,15 @@ A Magisk module for Android that automatically switches device profiles based on
 
 ## ⚙️ Configuration
 
-After installation, edit the configuration file at `/sdcard/CarOS/config.env`:
+The config is created at first boot in `/data/adb/caros/config.env` (readable by root only). For convenience, `/sdcard/CarOS/config.env` is read afterwards as an optional override: create it by hand and put only the keys you want to change. Only known `KEY=VALUE` keys are read; nothing in these files is executed. Changes are picked up within a few minutes without rebooting.
+
+```powershell
+# Edit from a PowerShell prompt with adb (rooted phone)
+adb shell su -c "cat /data/adb/caros/config.env"
+adb shell su -c "tail -n 50 /data/adb/caros/log.txt"
+```
+
+After installation, edit the configuration file at `/data/adb/caros/config.env`:
 
 > 💡 **Quick Start**: See [EXAMPLES.md](EXAMPLES.md) for ready-to-use configurations for Audi, VW, BMW, Mercedes, and more!
 
@@ -86,7 +94,7 @@ ENABLE_WIFI_AUDIO_HOTSPOT=0  # WiFi hotspot for audio streaming (alternative to 
 
 # WiFi hotspot settings (if using WiFi audio streaming)
 WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
-WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
+WIFI_AUDIO_HOTSPOT_PASSWORD="choose-a-password"
 
 # Verbose logging
 VERBOSE=1
@@ -122,7 +130,7 @@ When enabled (`ENABLE_WIFI_AUDIO_HOTSPOT=1`), your CarOS device creates a WiFi h
    ```bash
    ENABLE_WIFI_AUDIO_HOTSPOT=1
    WIFI_AUDIO_HOTSPOT_SSID="CarOS-Audio"
-   WIFI_AUDIO_HOTSPOT_PASSWORD="caros123"
+   WIFI_AUDIO_HOTSPOT_PASSWORD="choose-a-password"
    ```
 2. Connect your CarOS phone to car via USB
 3. On the emitting phone:
@@ -241,12 +249,12 @@ echo "Release created: rel/CarOS_Profile_Switcher-v${VERSION}.zip"
 ### Check Logs
 View module logs:
 ```bash
-adb shell cat /data/adb/modules/caros-switcher/log.txt
+adb shell cat /data/adb/caros/log.txt
 ```
 
 ### Check Current State
 ```bash
-adb shell cat /data/adb/modules/caros-switcher/state.json
+adb shell cat /data/adb/caros/state.json
 ```
 
 ### Common Issues
@@ -324,3 +332,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Note**: This module requires root access and modifies system behavior. Use at your own risk. Always test in a safe environment first.
+
+
+## 🚙 Carbox setup (always-plugged old phone)
+
+Suggested `config.env` for a phone that stays in the car and only does wired Android Auto:
+
+```bash
+ENABLE_WIRELESS_PROFILE=0   # wired only
+KEEP_BT_IN_IDLE=0           # nothing needs Bluetooth when the car is off
+DATA_OFF_OUTSIDE=1
+KEEP_WIFI_IN_IDLE=0
+PARKING_MODE=1              # no background scans/location, forced Doze while idle
+AUTO_SHUTDOWN_PCT=10        # protect the battery if the car does not charge it
+DISABLE_LOCKSCREEN=1        # only works with no PIN/pattern; security trade-off
+IDLE_MAX_CPU_FREQ=1000000   # kHz, adapt to your SoC
+```
+
+Things the module cannot do from a shell script:
+- **Power on when the car starts.** After a shutdown the phone must boot by itself when USB power returns. This depends on the device (some ROMs/bootloaders boot on charger insertion; others need `fastboot oem off-mode-charge 0` or similar). Test it on your phone.
+- **Limit the battery to 80 %.** Use [ACC (Advanced Charging Controller)](https://github.com/VR-25/acc); this module deliberately never suspends charging.
+- **Internet without a SIM.** Save the Wi-Fi of your main phone's hotspot and set `KEEP_WIFI_IN_WIRED=1`.

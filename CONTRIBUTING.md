@@ -84,7 +84,7 @@ caros-profile-switcher/
 1. Build the module: `./build.ps1` or `./build.sh`
 2. Install via Magisk Manager
 3. Reboot your device
-4. Check logs: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+4. Check logs: `adb shell cat /data/adb/caros/log.txt`
 5. Verify state changes work correctly
 
 ## 🔄 Release Process
@@ -133,7 +133,7 @@ git push origin main --tags
 ## 🐛 Debugging Tips
 
 ### Enable Verbose Logging
-In `/sdcard/CarOS/config.env`:
+In `/data/adb/caros/config.env`:
 ```bash
 VERBOSE=1
 ```
@@ -141,16 +141,16 @@ VERBOSE=1
 ### View Logs
 ```bash
 # Full log
-adb shell cat /data/adb/modules/caros-switcher/log.txt
+adb shell cat /data/adb/caros/log.txt
 
 # Last 50 lines
-adb shell tail -n 50 /data/adb/modules/caros-switcher/log.txt
+adb shell tail -n 50 /data/adb/caros/log.txt
 
 # Follow in real-time
-adb shell tail -f /data/adb/modules/caros-switcher/log.txt
+adb shell tail -f /data/adb/caros/log.txt
 
 # Check current state
-adb shell cat /data/adb/modules/caros-switcher/state.json
+adb shell cat /data/adb/caros/state.json
 ```
 
 ### Common Issues

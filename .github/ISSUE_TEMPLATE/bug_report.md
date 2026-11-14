@@ -29,7 +29,7 @@ assignees: ''
 - **Car Make/Model**: <!-- e.g., Audi A4 2021 -->
 
 ## Configuration
-<!-- Paste your /sdcard/CarOS/config.env here (remove sensitive info) -->
+<!-- Paste your /data/adb/caros/config.env here (remove sensitive info) -->
 ```bash
 AUDI_BT_NAMES="Your Car"
 AUDI_BT_MAC=""
@@ -39,7 +39,7 @@ ALLOW_BT_IN_WIRED=1
 
 ## Logs
 <!-- IMPORTANT: Include logs or we can't help! -->
-<!-- Run: adb shell cat /data/adb/modules/caros-switcher/log.txt -->
+<!-- Run: adb shell cat /data/adb/caros/log.txt -->
 ```
 Paste logs here
 ```

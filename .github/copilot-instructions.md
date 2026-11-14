@@ -50,7 +50,7 @@ CarOS Profile Switcher is a Magisk module for Android that automatically manages
 
 #### Configuration Flow
 1. Defaults defined in `caros_config.sh` (`DEFAULT_*` variables)
-2. User config at `/sdcard/CarOS/config.env` (generated from defaults)
+2. User config at `/data/adb/caros/config.env` (generated from defaults)
 3. `apply_defaults()` ensures all variables have values
 
 #### Service Loop
@@ -148,16 +148,16 @@ check_with_cache(){
 
 ### Path Conventions
 - Module files: `/data/adb/modules/caros-switcher/`
-- User config: `/sdcard/CarOS/config.env`
-- Logs: `/data/adb/modules/caros-switcher/log.txt`
-- State: `/data/adb/modules/caros-switcher/state.json`
+- User config: `/data/adb/caros/config.env`
+- Logs: `/data/adb/caros/log.txt`
+- State: `/data/adb/caros/state.json`
 
 ## Testing & Validation
 
 ### Before Committing
 1. Validate shell syntax: `bash -n script.sh`
 2. Test on actual device (if possible)
-3. Check logs for errors: `adb shell cat /data/adb/modules/caros-switcher/log.txt`
+3. Check logs for errors: `adb shell cat /data/adb/caros/log.txt`
 4. Verify version consistency across files
 
 ### Log Analysis

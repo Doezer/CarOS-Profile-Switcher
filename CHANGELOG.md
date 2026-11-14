@@ -4,6 +4,32 @@ All notable changes to CarOS Profile Switcher will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-14
+
+### Added
+- Carbox options: `ENABLE_WIRELESS_PROFILE` (0 for wired-only), `PARKING_MODE` (cut scans/location, force Doze while idle), `AUTO_SHUTDOWN_PCT` (shut down when idle, unplugged and low), `DISABLE_LOCKSCREEN`, `KEEP_BT_IN_IDLE`
+- `grant_permissions.sh` exempts Android Auto, Maps and Waze from Doze/background limits
+- The current profile is re-applied every 5 minutes, and the config is re-read live
+
+### Changed
+- Config moved to `/data/adb/caros/config.env` (root only); `/sdcard/CarOS/config.env` is still read as an optional override. Config files are parsed (whitelisted keys, never sourced), so an app can no longer run commands as root through the config
+- Logs and state moved to `/data/adb/caros/`
+- `post-fs-data.sh` is minimal; everything runs in `service.sh` after `sys.boot_completed`
+- Wired detection uses USB accessory mode; Bluetooth detection no longer matches "disconnected"
+- Charge limit only reduces current (never suspends charging) and restores original values
+- Bluetooth/Wi-Fi/data use `svc` and `cmd wifi`; battery saver uses `cmd power set-mode`
+- CPU limit is per cpufreq policy; screen off uses KEYCODE_SLEEP; Nova set through the HOME role
+- Polling every 10 s (instead of 3 s) while idle
+- The hotspot password is generated randomly when the config is created
+
+### Fixed
+- Idle profile ignored `DATA_OFF_OUTSIDE`
+- Nova fallback overwrote the default keyboard
+- Notification-listener list grew with invalid entries at every permission run
+- Wi-Fi hotspot used an invalid security type
+- Removed non-functional A2DP-sink system properties (feature is experimental and needs ROM support)
+
+
 ### Added
 - **🎵 Audio Streaming Feature**: Stream audio from another device to car speakers via two methods:
   - **Bluetooth A2DP Sink** (`ENABLE_BT_AUDIO_SINK`): Receive audio via Bluetooth
