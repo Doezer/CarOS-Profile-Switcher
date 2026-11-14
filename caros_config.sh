@@ -34,6 +34,9 @@ DEFAULT_KEEP_WIFI_IN_WIRED=0
 # IDLE: keep WiFi active (1) or turn it off (0) 
 DEFAULT_KEEP_WIFI_IN_IDLE=0
 
+# IDLE: keep Bluetooth active (1) or turn it off (0). Wireless AA needs it on; wired-only carbox can use 0
+DEFAULT_KEEP_BT_IN_IDLE=1
+
 # Automatic permission management (notifications and location)
 # Automatically grants necessary permissions for Android Auto, Waze, Maps, etc.
 DEFAULT_AUTO_GRANT_PERMISSIONS=1
@@ -93,6 +96,9 @@ KEEP_WIFI_IN_WIRED=$DEFAULT_KEEP_WIFI_IN_WIRED
 # IDLE: keep WiFi active (1) or turn it off (0) 
 KEEP_WIFI_IN_IDLE=$DEFAULT_KEEP_WIFI_IN_IDLE
 
+# IDLE: keep Bluetooth active (1) or turn it off (0)
+KEEP_BT_IN_IDLE=$DEFAULT_KEEP_BT_IN_IDLE
+
 # Automatic permission management (notifications and location)
 AUTO_GRANT_PERMISSIONS=$DEFAULT_AUTO_GRANT_PERMISSIONS
 
@@ -124,6 +130,7 @@ apply_defaults() {
   : "${SET_NOVA_DEFAULT:=$DEFAULT_SET_NOVA_DEFAULT}"
   : "${KEEP_WIFI_IN_WIRED:=$DEFAULT_KEEP_WIFI_IN_WIRED}"
   : "${KEEP_WIFI_IN_IDLE:=$DEFAULT_KEEP_WIFI_IN_IDLE}"
+  : "${KEEP_BT_IN_IDLE:=$DEFAULT_KEEP_BT_IN_IDLE}"
   : "${AUTO_GRANT_PERMISSIONS:=$DEFAULT_AUTO_GRANT_PERMISSIONS}"
   : "${ENABLE_BT_AUDIO_SINK:=$DEFAULT_ENABLE_BT_AUDIO_SINK}"
   : "${ENABLE_WIFI_AUDIO_HOTSPOT:=$DEFAULT_ENABLE_WIFI_AUDIO_HOTSPOT}"
